@@ -8,7 +8,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Aspen Covers">
 <title>Aspen Covers · Tracker</title>
-<link rel="manifest" href='data:application/manifest+json,{"name":"Aspen Covers Tracker","short_name":"Aspen Covers","description":"Service Department cover arrival tracker","start_url":"./","display":"standalone","orientation":"portrait","background_color":"%23FAFAF7","theme_color":"%230A1A3A","icons":[{"src":"data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 256 256%22><rect width=%22256%22 height=%22256%22 rx=%2256%22 fill=%22%230A1A3A%22/><text x=%22128%22 y=%22165%22 font-family=%22Georgia%22 font-size=%22120%22 font-style=%22italic%22 fill=%22%23B8924C%22 text-anchor=%22middle%22 font-weight=%22600%22>A</text></svg>","sizes":"256x256","type":"image/svg+xml"}]}'>
+
+<!-- Favicon: Italic "A" in gold over navy with accent line — matches "Aspen Covers" wordmark -->
+<link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" rx="56" fill="%230A1A3A"/><text x="128" y="178" font-family="Georgia,serif" font-size="170" font-style="italic" font-weight="700" fill="%23B8924C" text-anchor="middle">A</text><rect x="64" y="208" width="128" height="6" rx="3" fill="%23B8924C"/><circle cx="198" cy="58" r="8" fill="%23B8924C"/></svg>'>
+<link rel="apple-touch-icon" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" rx="56" fill="%230A1A3A"/><text x="128" y="178" font-family="Georgia,serif" font-size="170" font-style="italic" font-weight="700" fill="%23B8924C" text-anchor="middle">A</text><rect x="64" y="208" width="128" height="6" rx="3" fill="%23B8924C"/><circle cx="198" cy="58" r="8" fill="%23B8924C"/></svg>'>
+
+<link rel="manifest" href='data:application/manifest+json,{"name":"Aspen Covers Tracker","short_name":"Aspen Covers","description":"Service Department cover arrival tracker","start_url":"./","display":"standalone","orientation":"portrait","background_color":"%23FAFAF7","theme_color":"%230A1A3A","icons":[{"src":"data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 256 256%22><rect width=%22256%22 height=%22256%22 rx=%2256%22 fill=%22%230A1A3A%22/><text x=%22128%22 y=%22178%22 font-family=%22Georgia%22 font-size=%22170%22 font-style=%22italic%22 fill=%22%23B8924C%22 text-anchor=%22middle%22 font-weight=%22700%22>A</text><rect x=%2264%22 y=%22208%22 width=%22128%22 height=%226%22 rx=%223%22 fill=%22%23B8924C%22/><circle cx=%22198%22 cy=%2258%22 r=%228%22 fill=%22%23B8924C%22/></svg>","sizes":"256x256","type":"image/svg+xml"}]}'>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -647,6 +652,7 @@
   <span class="count" id="bulkCount">0 selected</span>
   <button class="bulk-primary" id="bulkArrived">✓ Mark arrived</button>
   <button id="bulkSchedule">📅 Schedule</button>
+  <button id="bulkServiceLog" title="Send to TECH-TICKETS Service Log (works for any cover not yet delivered)" style="background:#B8924C;color:white;border-color:#B8924C;font-weight:600">🎫 Service Log</button>
   <button id="bulkDelivered">🚚 Mark delivered</button>
   <button id="bulkInstalled">🔧 Mark installed</button>
   <button id="bulkUnmarkArrived" title="Unmark as arrived (for accidental marks)">↩️ Unmark arrived</button>
@@ -3654,6 +3660,37 @@ $('#bulkSchedule').addEventListener('click', () => bulkAction(i => {
   logChange(o, 'scheduled', {date: o.deliveryDate?.toISOString()?.slice(0,10), tech: o.deliveryTech});
   saveToStorage();
 }, '📅 Schedule for tomorrow'));
+
+// Send selected covers to TECH-TICKETS Service Log (works for any cover that's arrived or scheduled)
+$('#bulkServiceLog').addEventListener('click', () => {
+  const selected = [...selectedIds];
+  const eligible = selected.map(id => allCovers.findIndex(c => c.id === id))
+    .filter(i => i >= 0)
+    .filter(i => {
+      const o = allCovers[i];
+      if(o.deliveredAt || o.installedAt) return false; // skip already delivered
+      if(o.isStock || /drop.?ship/i.test(o.notes||'') || o.category === 'STOCK') return false; // skip stock
+      return true;
+    });
+
+  if(eligible.length === 0){
+    toast('No eligible covers selected (skip stock and already-delivered)', 'warn');
+    return;
+  }
+
+  const skipped = selected.length - eligible.length;
+  const N = eligible.length;
+  const msg = N === 1
+    ? `🎫 Send 1 cover to TECH-TICKETS Service Log?\n\nIt will open with the form auto-filled. Click + Create Ticket once you confirm with Alberto.`
+    : `🎫 Send ${N} cover${N===1?'':'s'} to TECH-TICKETS Service Log?\n\nOpens ${N} tab${N===1?'':'s'} — one per cover. Each will have the form auto-filled.${skipped > 0 ? `\n\n(${skipped} skipped: stock or already delivered)` : ''}`;
+
+  if(confirm(msg)){
+    eligible.forEach((idx, i) => {
+      setTimeout(() => openInTechTickets(idx, 'schedule'), i * 400);
+    });
+    toast(`🎫 Sending ${N} cover${N===1?'':'s'} to Service Log`, 'success');
+  }
+});
 $('#bulkDelivered').addEventListener('click', () => bulkAction(i => {
   const o = allCovers[i];
   if(!o.checkedIn) o.checkedIn = todayCheckedInStr();
