@@ -1,0 +1,4094 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0A1A3A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Aspen Covers">
+<title>Aspen Covers · Tracker</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Aspen Covers Tracker","short_name":"Aspen Covers","description":"Service Department cover arrival tracker","start_url":"./","display":"standalone","orientation":"portrait","background_color":"%23FAFAF7","theme_color":"%230A1A3A","icons":[{"src":"data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 256 256%22><rect width=%22256%22 height=%22256%22 rx=%2256%22 fill=%22%230A1A3A%22/><text x=%22128%22 y=%22165%22 font-family=%22Georgia%22 font-size=%22120%22 font-style=%22italic%22 fill=%22%23B8924C%22 text-anchor=%22middle%22 font-weight=%22600%22>A</text></svg>","sizes":"256x256","type":"image/svg+xml"}]}'>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg:#FAFAF7; --bg-card:#FFFFFF; --bg-elev:#F4F2EC;
+    --ink:#0A1A3A; --ink-soft:#2E3856; --ink-mute:#6B7390;
+    --line:#E8E4DA; --line-soft:#F0EDE5;
+    --gold:#B8924C; --gold-soft:#E8D8B0; --gold-bg:#FAF1DE;
+    --arrived:#1F6E48; --arrived-bg:#D7EFDF;
+    --late:#C03A2E; --late-bg:#FBDDD8;
+    --expected:#C99A2E; --expected-bg:#FBF1DA;
+    --transit:#2E6AA8; --transit-bg:#DDE9F7;
+    --dropship:#6B47A8; --dropship-bg:#E9DFF6;
+    --snd:#C25A2E; --snd-bg:#FBE0D2;
+    --stock:#5C5C5C; --stock-bg:#EAEAEA;
+    --pending:#9A9A9A; --pending-bg:#F0F0F0;
+    --radius-lg:18px; --radius-md:12px; --radius-sm:8px;
+    --shadow:0 1px 2px rgba(10,26,58,0.04),0 8px 24px rgba(10,26,58,0.05);
+    --shadow-h:0 2px 4px rgba(10,26,58,0.06),0 16px 40px rgba(10,26,58,0.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;font-feature-settings:'tnum' on,'lnum' on}
+  body{min-height:100vh;background:radial-gradient(circle at 12% 0%,rgba(184,146,76,0.06) 0%,transparent 40%),radial-gradient(circle at 92% 8%,rgba(46,106,168,0.04) 0%,transparent 35%),var(--bg)}
+
+  header.app-header{border-bottom:1px solid var(--line);background:rgba(255,255,255,0.7);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);position:sticky;top:0;z-index:100}
+  .header-inner{max-width:1400px;margin:0 auto;padding:18px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:14px}
+  .brand-mark{font-family:'Fraunces',serif;font-weight:500;font-size:26px;letter-spacing:-0.02em;color:var(--ink);font-variation-settings:"opsz" 144}
+  .brand-mark em{font-style:italic;color:var(--gold);font-weight:400}
+  .brand-sub{font-size:13px;color:var(--ink-mute);letter-spacing:0.02em;text-transform:uppercase;font-weight:500}
+  .header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .file-name{font-size:13px;color:var(--ink-mute);font-family:'JetBrains Mono',monospace;background:var(--bg-elev);padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--line-soft);max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .btn{font-family:inherit;font-size:14px;font-weight:500;padding:9px 14px;border-radius:var(--radius-sm);border:1px solid var(--line);cursor:pointer;transition:all .15s ease;display:inline-flex;align-items:center;gap:6px;background:var(--bg-card);color:var(--ink);white-space:nowrap}
+  .btn:hover{border-color:var(--ink-mute);transform:translateY(-1px);box-shadow:var(--shadow)}
+  .btn-primary{background:var(--ink);color:white;border-color:var(--ink)}
+  .btn-primary:hover{background:var(--ink-soft);border-color:var(--ink-soft)}
+  .btn-ghost{background:transparent;border-color:transparent}
+  .btn-ghost:hover{background:var(--bg-elev)}
+  .btn-gold{background:var(--gold);color:white;border-color:var(--gold)}
+  .btn-gold:hover{background:#A37F3F;border-color:#A37F3F}
+  .btn-green{background:var(--arrived);color:white;border-color:var(--arrived)}
+  .btn-green:hover{background:#155A38}
+  .btn-sm{padding:6px 10px;font-size:13px}
+  .btn-danger{background:transparent;color:var(--late);border-color:transparent}
+  .btn-danger:hover{background:var(--late-bg);border-color:var(--late-bg)}
+
+  main{max-width:1400px;margin:0 auto;padding:32px}
+  @media (max-width:720px){
+    .header-inner{padding:12px 14px;gap:10px}
+    main{padding:16px 12px}
+    .brand-mark{font-size:20px}
+    .brand-sub{display:none}
+    .header-actions{width:100%;justify-content:space-between;gap:6px}
+    .header-actions .btn{padding:8px 12px;font-size:13px}
+    .file-name{display:none}
+    .btn-ghost{padding:8px 10px}
+    /* Drawer becomes full-screen on phones */
+    .drawer{width:100vw}
+    /* Modal becomes full-screen on phones */
+    .modal-overlay{padding:0;align-items:stretch}
+    .modal{max-width:100%;border-radius:0;max-height:100vh;height:100%}
+    /* Email preview takes less vertical space */
+    .email-preview-wrap{padding:12px;max-height:420px}
+    .email-actions{width:100%}
+    .email-actions .btn{flex:1;justify-content:center;padding:10px 8px;font-size:12.5px}
+    /* KPI grid: 2 columns on phone */
+    .kpi-grid{grid-template-columns:repeat(2,1fr);gap:8px}
+    .kpi{padding:14px 12px}
+    .kpi-label{font-size:10.5px;margin-bottom:6px}
+    .kpi-value{font-size:30px}
+    .kpi-sublabel{font-size:10.5px}
+    /* Section title smaller */
+    .section-title{font-size:18px;margin-bottom:12px}
+    /* Table more compact */
+    table.data thead th{padding:10px 8px;font-size:10.5px}
+    table.data tbody td{padding:10px 8px;font-size:12.5px}
+    table.data tbody td:first-child{width:34px}
+    /* Filter chips smaller */
+    .chip{padding:6px 10px;font-size:12px}
+  }
+  @media (max-width:440px){
+    .kpi-grid{grid-template-columns:1fr}
+    .brand-mark{font-size:18px}
+  }
+
+  .empty-state{text-align:center;padding:80px 24px;max-width:640px;margin:60px auto;background:var(--bg-card);border-radius:var(--radius-lg);border:2px dashed var(--line);transition:all .2s ease}
+  .empty-state.drag-over{border-color:var(--gold);background:var(--gold-bg);transform:scale(1.01)}
+  .empty-icon{font-size:56px;margin-bottom:24px}
+  .empty-title{font-family:'Fraunces',serif;font-size:30px;font-weight:400;color:var(--ink);margin-bottom:12px;letter-spacing:-0.02em}
+  .empty-title em{color:var(--gold);font-style:italic}
+  .empty-desc{color:var(--ink-mute);font-size:15px;margin-bottom:28px;line-height:1.6}
+  .empty-desc code{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--bg-elev);padding:2px 6px;border-radius:4px;color:var(--ink)}
+
+  .section-title{font-family:'Fraunces',serif;font-size:22px;font-weight:500;letter-spacing:-0.015em;color:var(--ink);margin-bottom:18px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .section-title-meta{font-family:'DM Sans',sans-serif;font-weight:400;font-size:13px;color:var(--ink-mute)}
+  .section-title-meta .changes-badge{background:var(--gold-bg);color:var(--gold);padding:3px 10px;border-radius:100px;font-weight:600;font-size:12px;margin-left:6px}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:36px}
+  @media (max-width:1080px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+  @media (max-width:720px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:440px){.kpi-grid{grid-template-columns:1fr}}
+  .kpi{background:var(--bg-card);border-radius:var(--radius-lg);padding:22px 20px;border:1px solid var(--line-soft);cursor:pointer;transition:all .18s ease;position:relative;overflow:hidden}
+  .kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent,var(--ink-mute));opacity:.65}
+  .kpi:hover{box-shadow:var(--shadow-h);transform:translateY(-2px)}
+  .kpi.active{box-shadow:0 0 0 2px var(--ink)}
+  .kpi-label{font-size:12px;font-weight:600;color:var(--ink-mute);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px}
+  .kpi-value{font-family:'Fraunces',serif;font-weight:500;font-size:42px;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;font-variation-settings:"opsz" 144}
+  .kpi-sublabel{font-size:11.5px;color:var(--ink-mute);margin-top:6px}
+  .k-arrived{--accent:#E89B6F}
+  .k-late{--accent:var(--late)}
+  .k-expected{--accent:var(--expected)}
+  .k-dropship{--accent:var(--dropship)}
+  .k-pending{--accent:#9A9A9A}
+  .k-delivered{--accent:#2E8B57}
+  .k-stock{--accent:var(--gold)}
+
+  .email-card{background:var(--bg-card);border-radius:var(--radius-lg);border:1px solid var(--line-soft);overflow:hidden;margin-bottom:36px;box-shadow:var(--shadow)}
+  .email-head{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;flex-wrap:wrap;gap:12px;border-bottom:1px solid var(--line-soft);background:var(--bg-elev)}
+  .email-head h3{font-family:'Fraunces',serif;font-weight:500;font-size:20px;letter-spacing:-0.01em;display:flex;align-items:center;gap:10px}
+  .email-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .email-preview-wrap{padding:24px;background:#EEEAE0;max-height:680px;overflow-y:auto}
+  .email-preview-frame{background:white;max-width:640px;margin:0 auto;box-shadow:0 4px 24px rgba(10,26,58,0.10);border-radius:8px;overflow:hidden}
+
+  .toolbar{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;align-items:center}
+  .search{flex:1;min-width:240px;position:relative}
+  .search input{width:100%;padding:11px 14px 11px 38px;font-family:inherit;font-size:14px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius-sm);color:var(--ink);transition:all .15s}
+  .search input:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 3px rgba(10,26,58,0.08)}
+  .search::before{content:'';position:absolute;left:14px;top:50%;width:14px;height:14px;transform:translateY(-50%);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%236B7390'%3E%3Cpath d='M11 7a4 4 0 11-8 0 4 4 0 018 0zm-.4 4.6a6 6 0 111.4-1.4l3.4 3.4-1.4 1.4-3.4-3.4z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-size:contain}
+  .filter-chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{padding:7px 12px;font-size:13px;font-weight:500;border-radius:100px;background:var(--bg-card);border:1px solid var(--line);color:var(--ink-soft);cursor:pointer;transition:all .15s}
+  .chip:hover{border-color:var(--ink-mute)}
+  .chip.active{background:var(--ink);color:white;border-color:var(--ink)}
+
+  .table-wrap{background:var(--bg-card);border-radius:var(--radius-lg);border:1px solid var(--line-soft);overflow:hidden;box-shadow:var(--shadow)}
+  .table-scroll{overflow-x:auto}
+  table.data{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.data thead th{text-align:left;padding:14px 16px;font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-mute);background:var(--bg-elev);border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
+  table.data thead th:first-child{cursor:default;width:40px;padding:14px 8px;text-align:center}
+  table.data thead th:hover{color:var(--ink)}
+  table.data thead th .sort-ind{font-size:10px;margin-left:4px;opacity:.5}
+  table.data tbody td{padding:11px 16px;border-bottom:1px solid var(--line-soft);vertical-align:middle;color:var(--ink)}
+  table.data tbody td:first-child{padding:8px;text-align:center;width:40px}
+  table.data tbody tr:hover{background:var(--bg-elev)}
+  table.data tbody tr.row-modified{box-shadow:inset 3px 0 0 var(--gold)}
+  /* The 3 visual states matching Alberto's Excel color code */
+  table.data tbody tr.row-pending{background:transparent}
+  table.data tbody tr.row-warehouse{background:linear-gradient(90deg,rgba(232,155,111,0.18) 0%,rgba(232,155,111,0.06) 50%,transparent 100%)}
+  table.data tbody tr.row-delivered{background:linear-gradient(90deg,rgba(46,139,87,0.18) 0%,rgba(46,139,87,0.06) 50%,transparent 100%)}
+  table.data tbody tr.row-stock{background:linear-gradient(90deg,rgba(184,146,76,0.18) 0%,rgba(184,146,76,0.06) 50%,transparent 100%)}
+  table.data tbody tr.row-dropship{background:linear-gradient(90deg,rgba(107,71,168,0.12) 0%,rgba(107,71,168,0.04) 50%,transparent 100%)}
+  table.data tbody tr.row-selected{background:linear-gradient(90deg,rgba(184,146,76,0.25) 0%,rgba(184,146,76,0.08) 100%);box-shadow:inset 4px 0 0 var(--gold)}
+  table.data tbody tr:last-child td{border-bottom:none}
+  td.mono{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--ink-soft)}
+  td.customer{font-weight:500;cursor:pointer}
+  td.customer:hover{color:var(--gold)}
+
+  /* Custom checkbox */
+  .check-row{appearance:none;-webkit-appearance:none;width:22px;height:22px;border:2px solid var(--line);border-radius:6px;cursor:pointer;position:relative;transition:all .15s ease;background:white;vertical-align:middle}
+  .check-row:hover{border-color:var(--arrived)}
+  .check-row:checked{background:var(--arrived);border-color:var(--arrived)}
+  .check-row:checked::after{content:'';position:absolute;left:5px;top:1px;width:6px;height:12px;border:solid white;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+
+  .status-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:100px;font-size:11.5px;font-weight:600;letter-spacing:0.03em;white-space:nowrap}
+  .status-pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+  .s-ARRIVED{color:var(--arrived);background:var(--arrived-bg)}
+  .s-LATE{color:var(--late);background:var(--late-bg)}
+  .s-EXPECTED{color:var(--expected);background:var(--expected-bg)}
+  .s-INTRANSIT{color:var(--transit);background:var(--transit-bg)}
+  .s-DROPSHIP{color:var(--dropship);background:var(--dropship-bg)}
+  .s-SND{color:var(--snd);background:var(--snd-bg)}
+  .s-STOCK{color:var(--gold);background:var(--gold-bg)}
+  .s-PENDING{color:var(--pending);background:var(--pending-bg)}
+  .s-DELIVERED{color:var(--arrived);background:var(--arrived-bg)}
+  .s-SCHEDULED{color:#8E44AD;background:#EFDFFF}
+  .s-OUTFORDELIVERY{color:#0277BD;background:#D5ECFA}
+  .s-INSTALLED{color:#1F6E48;background:#B8E5BA}
+
+  /* Status stepper — visual progression in drawer */
+  .stepper{display:flex;align-items:center;gap:0;margin-bottom:14px;padding:14px;background:#F8F6F0;border-radius:var(--radius-md);overflow-x:auto}
+  .step{flex:1;min-width:60px;text-align:center;position:relative;font-size:10px;font-weight:600;color:var(--ink-mute);text-transform:uppercase;letter-spacing:0.04em}
+  .step-dot{width:22px;height:22px;border-radius:50%;background:white;border:2px solid var(--line);margin:0 auto 5px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink-mute);font-weight:700;transition:all .2s}
+  .step.done .step-dot{background:var(--arrived);border-color:var(--arrived);color:white}
+  .step.current .step-dot{background:var(--gold);border-color:var(--gold);color:white;box-shadow:0 0 0 4px var(--gold-bg);transform:scale(1.15)}
+  .step.done{color:var(--arrived)}
+  .step.current{color:var(--ink)}
+  .step::after{content:'';position:absolute;top:11px;left:60%;right:-40%;height:2px;background:var(--line);z-index:-1}
+  .step:last-child::after{display:none}
+  .step.done::after{background:var(--arrived)}
+
+  /* Photo gallery */
+  .photo-strip{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .photo-thumb{width:72px;height:72px;border-radius:var(--radius-sm);background-size:cover;background-position:center;cursor:pointer;border:1px solid var(--line);position:relative;transition:transform .15s}
+  .photo-thumb:hover{transform:scale(1.05);box-shadow:var(--shadow)}
+  .photo-thumb .x{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--late);color:white;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;opacity:0;transition:opacity .15s}
+  .photo-thumb:hover .x{opacity:1}
+  .photo-add{width:72px;height:72px;border-radius:var(--radius-sm);border:2px dashed var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:var(--bg-card);color:var(--ink-mute);font-size:11px;font-weight:500;transition:all .15s;gap:2px}
+  .photo-add:hover{border-color:var(--gold);color:var(--gold);background:var(--gold-bg)}
+  .photo-add .icon{font-size:22px}
+
+  /* Lightbox */
+  .lightbox{position:fixed;inset:0;background:rgba(10,26,58,.92);z-index:500;display:flex;align-items:center;justify-content:center;padding:30px;opacity:0;pointer-events:none;transition:opacity .2s}
+  .lightbox.open{opacity:1;pointer-events:auto}
+  .lightbox img{max-width:100%;max-height:100%;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.4)}
+  .lightbox .close-lb{position:absolute;top:20px;right:20px;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.15);color:white;border:none;cursor:pointer;font-size:20px;backdrop-filter:blur(10px)}
+
+  /* Signature canvas */
+  .sig-modal canvas{border:2px solid var(--line);border-radius:var(--radius-md);background:white;width:100%;display:block;touch-action:none;cursor:crosshair}
+  .sig-saved{background:var(--bg-elev);padding:10px;border-radius:var(--radius-sm);text-align:center}
+  .sig-saved img{max-width:100%;max-height:120px;background:white;padding:6px;border-radius:6px;border:1px solid var(--line)}
+
+  .empty-table{padding:60px 24px;text-align:center;color:var(--ink-mute);font-style:italic}
+
+  /* Drawer */
+  .drawer-overlay{position:fixed;inset:0;background:rgba(10,26,58,.25);backdrop-filter:blur(4px);z-index:200;opacity:0;pointer-events:none;transition:opacity .2s ease}
+  .drawer-overlay.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100vw);background:var(--bg-card);box-shadow:-8px 0 40px rgba(10,26,58,.15);z-index:201;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);overflow-y:auto}
+  .drawer.open{transform:translateX(0)}
+  .drawer-head{padding:24px 28px 16px;border-bottom:1px solid var(--line-soft);position:sticky;top:0;background:var(--bg-card);z-index:2}
+  .drawer-head .close{position:absolute;top:18px;right:18px;width:32px;height:32px;border:none;background:var(--bg-elev);border-radius:50%;cursor:pointer;font-size:16px;color:var(--ink-soft)}
+  .drawer-cust{font-family:'Fraunces',serif;font-weight:500;font-size:26px;letter-spacing:-0.015em;line-height:1.2;margin-bottom:6px}
+  .drawer-sub{color:var(--ink-mute);font-size:13px;font-family:'JetBrains Mono',monospace}
+  .drawer-body{padding:24px 28px 32px}
+  .drawer-section{margin-bottom:24px}
+  .drawer-section h4{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-mute);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+  .drawer-row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:14px;align-items:center;gap:10px}
+  .drawer-row:last-child{border-bottom:none}
+  .drawer-row .k{color:var(--ink-mute);flex:0 0 auto}
+  .drawer-row .v{color:var(--ink);font-weight:500;text-align:right;flex:1}
+  .drawer-row .v.mono{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500}
+  .drawer-row input.edit-field,.drawer-row textarea.edit-field{width:100%;padding:7px 10px;font-family:inherit;font-size:13px;border:1px solid var(--line);border-radius:6px;background:white;color:var(--ink);text-align:right}
+  .drawer-row textarea.edit-field{text-align:left;resize:vertical;min-height:60px;font-family:'JetBrains Mono',monospace;font-size:12px}
+  .drawer-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:18px;border-top:1px solid var(--line-soft)}
+  .drawer-arrival-btn{width:100%;padding:14px;font-family:inherit;font-size:14px;font-weight:600;border-radius:var(--radius-md);border:none;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px}
+  .drawer-arrival-btn.mark-arrived{background:var(--arrived);color:white}
+  .drawer-arrival-btn.mark-arrived:hover{background:#155A38}
+  .drawer-arrival-btn.unmark{background:var(--bg-elev);color:var(--ink-soft);border:1px solid var(--line)}
+  .drawer-arrival-btn.unmark:hover{background:var(--late-bg);color:var(--late)}
+
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(10,26,58,.4);backdrop-filter:blur(6px);z-index:300;opacity:0;pointer-events:none;transition:opacity .2s ease;display:flex;align-items:center;justify-content:center;padding:20px}
+  .modal-overlay.open{opacity:1;pointer-events:auto}
+  .modal{background:var(--bg-card);border-radius:var(--radius-lg);max-width:520px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(10,26,58,.25);transform:scale(0.96);transition:transform .2s ease}
+  .modal-overlay.open .modal{transform:scale(1)}
+  .modal-head{padding:24px 28px 8px;display:flex;align-items:flex-start;justify-content:space-between}
+  .modal-title{font-family:'Fraunces',serif;font-size:22px;font-weight:500;letter-spacing:-0.015em;color:var(--ink)}
+  .modal-subtitle{font-size:13px;color:var(--ink-mute);margin-top:4px}
+  .modal-close{width:32px;height:32px;border:none;background:var(--bg-elev);border-radius:50%;cursor:pointer;font-size:16px;color:var(--ink-soft);flex:0 0 auto}
+  .modal-body{padding:16px 28px 8px}
+  .field-group{margin-bottom:14px}
+  .field-group label{display:block;font-size:12px;font-weight:600;color:var(--ink-mute);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px}
+  .field-group input,.field-group select,.field-group textarea{width:100%;padding:10px 12px;font-family:inherit;font-size:14px;border:1px solid var(--line);border-radius:var(--radius-sm);background:white;color:var(--ink);transition:all .15s}
+  .field-group input:focus,.field-group select:focus,.field-group textarea:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 3px rgba(10,26,58,0.08)}
+  .field-group textarea{min-height:64px;resize:vertical}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .modal-foot{padding:16px 28px 24px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+
+  /* Toggle group (Stock vs Customer cover) */
+  .toggle-group{display:flex;background:var(--bg-elev);border-radius:var(--radius-sm);padding:4px;margin-bottom:16px;gap:2px}
+  .toggle-group button{flex:1;padding:9px 12px;border:none;background:transparent;border-radius:6px;font-family:inherit;font-size:13px;font-weight:500;color:var(--ink-mute);cursor:pointer;transition:all .15s}
+  .toggle-group button.active{background:white;color:var(--ink);box-shadow:0 1px 3px rgba(10,26,58,0.08);font-weight:600}
+  .toggle-group button:hover:not(.active){color:var(--ink)}
+
+  /* NEW today badge */
+  .new-badge{display:inline-block;font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:100px;background:var(--gold);color:white;letter-spacing:0.04em;text-transform:uppercase;margin-left:6px;vertical-align:middle}
+
+  /* Aging text — days in warehouse */
+  .aging-text{font-size:11px;color:var(--ink-mute);font-weight:500;font-style:italic;margin-left:6px}
+  .aging-text.warn{color:var(--late);font-weight:600;font-style:normal}
+
+  /* Floating Action Button — mobile shortcut */
+  .fab{position:fixed;bottom:20px;right:20px;width:60px;height:60px;border-radius:50%;background:var(--arrived);color:white;border:none;font-size:30px;cursor:pointer;box-shadow:0 8px 24px rgba(31,110,72,0.35);z-index:90;display:none;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s}
+  .fab:active{transform:scale(0.92)}
+  .fab:hover{box-shadow:0 10px 30px rgba(31,110,72,0.45)}
+  @media (max-width:720px){.fab{display:flex}}
+
+  /* Bulk action bar — sticky at bottom */
+  .bulk-bar{position:fixed;bottom:0;left:0;right:0;background:var(--ink);color:white;padding:14px 20px;display:none;align-items:center;gap:12px;flex-wrap:wrap;z-index:80;box-shadow:0 -8px 24px rgba(10,26,58,0.2)}
+  .bulk-bar.show{display:flex}
+  .bulk-bar .count{font-weight:600;font-size:14px;flex:0 0 auto}
+  .bulk-bar .spacer{flex:1}
+  .bulk-bar button{padding:8px 12px;border-radius:6px;border:none;background:rgba(255,255,255,0.14);color:white;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;transition:background .15s}
+  .bulk-bar button:hover{background:rgba(255,255,255,0.24)}
+  .bulk-bar button.bulk-primary{background:var(--arrived)}
+  .bulk-bar button.bulk-primary:hover{background:#155A38}
+  .bulk-bar button.bulk-clear{background:transparent;color:rgba(255,255,255,0.7)}
+
+  /* Undo toast — extends regular toast */
+  .toast.undo{background:var(--ink);padding:0;display:flex;align-items:center;gap:0;overflow:hidden}
+  .toast.undo .msg{padding:12px 18px}
+  .toast.undo button{background:var(--gold);color:white;border:none;padding:14px 22px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s}
+  .toast.undo button:hover{background:#A37F3F}
+
+  /* Yesterday recap card */
+  .recap-card{background:linear-gradient(135deg,#FAF1DE 0%,#F4E8C8 100%);border:1px solid var(--gold-soft);border-radius:var(--radius-md);padding:16px 18px;margin-bottom:22px;font-size:14px;color:var(--ink);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .recap-card .icon{font-size:22px}
+  .recap-card .text{flex:1}
+  .recap-card strong{color:var(--ink);font-weight:600}
+  .recap-card .dismiss{background:transparent;border:none;color:var(--ink-mute);cursor:pointer;font-size:18px;padding:4px 8px}
+
+  /* Critical 45d+ banner — red, top priority */
+  .critical-banner{background:linear-gradient(135deg,#FBE0D2 0%,#F8D2C0 100%);border:1px solid #E89B6F;border-left:4px solid var(--late);border-radius:var(--radius-md);padding:14px 18px;margin-bottom:18px;font-size:14px;color:#7C2D12;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .critical-banner .icon{font-size:22px}
+  .critical-banner .text{flex:1;font-weight:500}
+  .critical-banner .text strong{color:var(--late);font-weight:700}
+  .critical-banner .cb-action{background:var(--late);color:white;border:none;padding:8px 14px;border-radius:6px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s}
+  .critical-banner .cb-action:hover{background:#A03C20}
+
+  /* Note template chips */
+  .note-tpl{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;font-size:11.5px;font-weight:500;background:var(--bg-elev);color:var(--ink);border:1px solid var(--line);border-radius:100px;cursor:pointer;transition:all .15s;font-family:inherit}
+
+  /* Old order badge (60+ days since order date) */
+  .old-badge{display:inline-block;font-size:9.5px;font-weight:600;background:#F4E4D0;color:#A06030;padding:2px 6px;border-radius:10px;margin-left:6px;letter-spacing:0.04em;vertical-align:middle;border:1px solid #E8C8A8}
+  .note-tpl:hover{background:var(--gold-bg);border-color:var(--gold);color:var(--gold)}
+  .note-tpl.suggested{background:var(--gold-bg);border-color:var(--gold);color:var(--gold);animation:pulse 2s ease-out 1}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(184,146,76,0.4)}70%{box-shadow:0 0 0 8px rgba(184,146,76,0)}100%{box-shadow:0 0 0 0 rgba(184,146,76,0)}}
+  @keyframes slideDown{0%{opacity:0;transform:translateY(-10px)}100%{opacity:1;transform:translateY(0)}}
+
+  /* Auto-suggest banner */
+  .note-suggest{background:linear-gradient(90deg,#FAF1DE 0%,#FBF1DA 100%);border:1px solid var(--gold-soft);border-radius:6px;padding:8px 12px;font-size:12px;color:var(--ink);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .note-suggest .ns-text{flex:1}
+  .note-suggest .ns-action{background:var(--gold);color:white;border:none;padding:5px 11px;border-radius:5px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
+  .note-suggest .ns-dismiss{background:transparent;border:none;color:var(--ink-mute);cursor:pointer;font-size:15px;padding:2px 6px}
+
+  /* PWA install banner */
+  .install-banner{background:linear-gradient(135deg,#0A1A3A 0%,#1B2D54 100%);color:white;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:13px}
+  .install-banner .ib-text{flex:1}
+  .install-banner button{background:var(--gold);color:white;border:none;padding:8px 14px;border-radius:6px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+  .install-banner button.ib-dismiss{background:transparent;border:1px solid rgba(255,255,255,0.3);font-weight:400}
+
+  /* Global quick search */
+  .global-search{position:relative;flex:0 0 auto;max-width:260px;min-width:140px}
+  .global-search input{width:100%;padding:8px 12px 8px 32px;font-family:inherit;font-size:13.5px;background:var(--bg-elev);border:1px solid var(--line);border-radius:var(--radius-sm);color:var(--ink);transition:all .15s}
+  .global-search input:focus{outline:none;border-color:var(--ink);background:white;box-shadow:0 0 0 3px rgba(10,26,58,0.06)}
+  .global-search::before{content:'';position:absolute;left:10px;top:50%;width:13px;height:13px;transform:translateY(-50%);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%236B7390'%3E%3Cpath d='M11 7a4 4 0 11-8 0 4 4 0 018 0zm-.4 4.6a6 6 0 111.4-1.4l3.4 3.4-1.4 1.4-3.4-3.4z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-size:contain}
+  .gs-results{position:absolute;top:100%;left:0;right:0;background:white;border:1px solid var(--line);border-radius:var(--radius-sm);box-shadow:var(--shadow-h);max-height:320px;overflow-y:auto;margin-top:4px;display:none;z-index:99}
+  .gs-results.show{display:block}
+  .gs-result{padding:10px 12px;border-bottom:1px solid var(--line-soft);cursor:pointer;font-size:13px}
+  .gs-result:hover{background:var(--bg-elev)}
+  .gs-result:last-child{border-bottom:none}
+  .gs-result .name{font-weight:600;color:var(--ink)}
+  .gs-result .meta{color:var(--ink-mute);font-size:11.5px;font-family:'JetBrains Mono',monospace;margin-top:2px}
+  .gs-result .pill{display:inline-block;font-size:10px;padding:1px 6px;border-radius:100px;margin-left:6px;font-weight:600}
+  @media (max-width:720px){.global-search{display:none}}
+
+  /* Connection status pill */
+  .conn-status{font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:100px;letter-spacing:0.02em;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;font-family:inherit}
+  .conn-status.connecting{background:#FBF1DA;color:#C99A2E}
+  .conn-status.connected{background:#D7EFDF;color:#1F6E48}
+  .conn-status.error{background:#FBE0D2;color:#C25A2E}
+  .conn-status.local{background:#E4E4E7;color:#52525B}
+  @media (max-width:720px){
+    .conn-status{font-size:10px;padding:4px 8px}
+    .conn-status.connected::after{content:''}
+    #invoiceLink{display:none}
+  }
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:white;padding:12px 22px;border-radius:100px;font-size:14px;font-weight:500;box-shadow:0 8px 24px rgba(10,26,58,.2);opacity:0;transition:all .25s ease;z-index:400;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.success{background:var(--arrived)}
+
+  .hidden{display:none !important}
+
+  @media print {
+    header.app-header,.toolbar,.email-actions,.btn{display:none}
+    body{background:white}
+    .email-preview-wrap{background:white;padding:0;max-height:none}
+    .email-preview-frame{box-shadow:none}
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-mark">Aspen <em>Covers</em></div>
+      <div class="brand-sub">Tracker · Service Dept.</div>
+    </div>
+    <div class="header-actions">
+      <span class="conn-status connecting" id="connStatus">⏳ Connecting…</span>
+      <a href="https://aspenservices.github.io/invoice-tracker/" target="_blank" rel="noopener" class="btn btn-ghost" id="invoiceLink" title="Open Invoice Tracker in new tab">📋 Invoices</a>
+      <div class="global-search" id="globalSearchWrap">
+        <input type="text" id="globalSearchInput" placeholder="Quick search…" autocomplete="off">
+        <div class="gs-results" id="globalSearchResults"></div>
+      </div>
+      <span class="file-name hidden" id="fileName"></span>
+      <button class="btn btn-green hidden" id="addStockBtn">➕ Add Arrival</button>
+      <button class="btn btn-ghost hidden" id="deliveredReportBtn" title="See list of delivered/picked up covers — copy for SMS or email">✅ Delivered</button>
+      <button class="btn btn-ghost hidden" id="cleanExcelBtn" title="Generate clean Excel — moves delivered/picked up to Archive sheet. Ready to email Manuela.">🧹 Clean Excel</button>
+      <button class="btn btn-ghost hidden" id="weeklyReportBtn" title="Send weekly report to Tom">📊 Weekly</button>
+      <button class="btn btn-gold hidden" id="exportXlsxBtn">📥 Export Excel</button>
+      <button class="btn btn-ghost" id="reloadBtn">↻ Reload</button>
+      <button class="btn btn-primary" id="uploadBtn">⬆ Upload Excel</button>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="emptyState" class="empty-state">
+    <div class="empty-icon">📦</div>
+    <div class="empty-title">Drop your <em>Inventory_ A&amp;B, Covers, Saunas.xlsx</em> here</div>
+    <div class="empty-desc">
+      Or click <strong>Upload Excel</strong>. The dashboard reads the <code>Covers</code> sheet — column A "Checked in" is the arrival flag. You can <strong>edit and add covers</strong> right here, then export the updated file back to Excel.
+    </div>
+    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">⬆ Choose File</button>
+  </div>
+
+  <div id="dashboard" class="hidden">
+
+    <div id="criticalBanner" class="critical-banner hidden">
+      <span class="icon">🚨</span>
+      <span class="text" id="criticalText"></span>
+      <button class="cb-action" id="criticalEmail">📧 Email Celia</button>
+      <button class="cb-action" id="criticalAction" style="background:transparent;border:1px solid var(--late);color:var(--late);">See list →</button>
+    </div>
+
+    <div id="recapCard" class="recap-card hidden">
+      <span class="icon">☀️</span>
+      <span class="text" id="recapText"></span>
+      <button class="dismiss" id="recapDismiss" title="Dismiss">✕</button>
+    </div>
+
+    <h2 class="section-title">
+      Cover status overview
+      <span class="section-title-meta" id="lastSync"></span>
+      <span class="section-title-meta hidden" id="changesBadge"><span class="changes-badge">0 changes</span></span>
+    </h2>
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div id="oldOrdersAlert"></div>
+
+    <div class="email-card">
+      <div class="email-head">
+        <h3>✉️ Daily Cover Activity Report</h3>
+        <div class="email-actions">
+          <button class="btn" id="copyHtmlBtn">📋 Copy HTML</button>
+          <button class="btn btn-gold" id="downloadEmlBtn">💾 Download .eml</button>
+          <button class="btn btn-primary" id="openOutlookBtn">📨 Outlook</button>
+        </div>
+      </div>
+      <div style="padding:12px 24px;border-bottom:1px solid var(--line-soft);background:var(--bg-card);">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;gap:10px;flex-wrap:wrap;">
+          <label style="font-size:11px;font-weight:600;color:var(--ink-mute);text-transform:uppercase;letter-spacing:0.05em;">Special notes for the email (optional, one per line)</label>
+          <span style="font-size:10.5px;color:var(--ink-mute);">Tip: click a template below to insert</span>
+        </div>
+        <textarea id="emailSpecialNote" rows="3" placeholder='e.g. "Please note that the Colorado covers will be sent to Building 4 at Goodfellow."' style="width:100%;padding:10px 12px;font-family:inherit;font-size:13px;line-height:1.5;border:1px solid var(--line);border-radius:6px;background:white;color:var(--ink);resize:vertical;min-height:50px;"></textarea>
+        <div id="noteTemplates" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+        <div id="noteAutoSuggest" style="margin-top:8px;"></div>
+      </div>
+      <div class="email-preview-wrap">
+        <div class="email-preview-frame" id="emailPreview"></div>
+      </div>
+    </div>
+
+    <h2 class="section-title">All covers <span class="section-title-meta" id="rowCount"></span></h2>
+
+    <div class="toolbar">
+      <div class="search"><input type="text" id="searchInput" placeholder="Search customer, PO, tracking, notes…"></div>
+      <div class="filter-chips" id="filterChips"></div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table class="data" id="dataTable">
+          <thead>
+            <tr>
+              <th><input type="checkbox" class="check-row" id="bulkSelectAll" onclick="event.stopPropagation()" title="Select all visible"></th>
+              <th data-sort="customer">Customer <span class="sort-ind"></span></th>
+              <th data-sort="poNumber">PO# <span class="sort-ind"></span></th>
+              <th data-sort="orderDate">Order Date <span class="sort-ind"></span></th>
+              <th data-sort="notes">Notes <span class="sort-ind"></span></th>
+              <th data-sort="estShipDate">Est Ship <span class="sort-ind"></span></th>
+              <th data-sort="expectedRecDate">Expected <span class="sort-ind"></span></th>
+              <th data-sort="tracking">Tracking <span class="sort-ind"></span></th>
+              <th data-sort="checkedIn">Checked In <span class="sort-ind"></span></th>
+              <th data-sort="category">Status <span class="sort-ind"></span></th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Drawer -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <button class="close" id="closeDrawer">✕</button>
+    <div class="drawer-cust" id="drawerCust"></div>
+    <div class="drawer-sub" id="drawerSub"></div>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<!-- Add Arrival Modal (Stock OR Customer cover) -->
+<div class="modal-overlay" id="addStockModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">Add arrival</div>
+        <div class="modal-subtitle">Gets auto-marked as arrived today</div>
+      </div>
+      <button class="modal-close" id="closeAddStock">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Toggle between Stock and Customer -->
+      <div class="toggle-group">
+        <button id="toggleStock" class="active">📦 Stock bulk</button>
+        <button id="toggleCustomer">👤 Customer cover</button>
+      </div>
+
+      <!-- CUSTOMER mode: name first -->
+      <div id="customerFields" style="display:none;">
+        <div class="field-group">
+          <label for="customerName">Customer name *</label>
+          <input type="text" id="customerName" list="customerSuggestions" placeholder="e.g. Mendes, Barbara" autocomplete="off">
+          <datalist id="customerSuggestions"></datalist>
+        </div>
+        <div class="field-row">
+          <div class="field-group">
+            <label for="customerPhone">Phone (optional)</label>
+            <input type="tel" id="customerPhone" placeholder="314-555-0101">
+          </div>
+          <div class="field-group">
+            <label for="customerEmail">Email (optional)</label>
+            <input type="email" id="customerEmail" placeholder="customer@email.com">
+          </div>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="stockModel">Cover model</label>
+          <select id="stockModel">
+            <option value="">— Don't know yet —</option>
+            <option value="Colorado">Colorado</option>
+            <option value="Arcadia">Arcadia</option>
+            <option value="Monarch">Monarch</option>
+            <option value="Quattro">Quattro</option>
+            <option value="Alpine">Alpine</option>
+            <option value="Other">Other (specify in notes)</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label for="stockColor">Color</label>
+          <select id="stockColor">
+            <option value="">— Don't know yet —</option>
+            <option value="Charcoal">Charcoal</option>
+            <option value="Walnut">Walnut</option>
+            <option value="Coffee">Coffee</option>
+            <option value="Grey">Grey</option>
+            <option value="Black">Black</option>
+            <option value="Mixed">Mixed (specify in notes)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field-group">
+          <label for="stockQty">Quantity</label>
+          <input type="number" id="stockQty" min="1" value="1">
+        </div>
+        <div class="field-group">
+          <label for="stockPO">PO #</label>
+          <input type="text" id="stockPO" placeholder="e.g. 25369">
+          <div id="dupPoWarning" style="display:none;margin-top:6px;font-size:11.5px;color:var(--late);font-weight:500;">⚠️ This PO# already exists in the list.</div>
+        </div>
+      </div>
+      <div class="field-group">
+        <label for="stockTracking">Tracking # (optional)</label>
+        <input type="text" id="stockTracking" placeholder="e.g. ABF Pro #222998753">
+      </div>
+      <!-- DEALER toggle (Customer mode only) -->
+      <div class="field-group" id="dealerFlagGroup" style="display:none;">
+        <label>Type</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:500;cursor:pointer;padding:8px 12px;border:1px solid var(--line);border-radius:6px;">
+            <input type="checkbox" id="customerDealer"> DEALER
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-weight:500;cursor:pointer;padding:8px 12px;border:1px solid var(--line);border-radius:6px;">
+            <input type="checkbox" id="customerDropShip"> DROP SHIP
+          </label>
+        </div>
+      </div>
+      <div class="field-group">
+        <label for="stockNotes">Notes (optional)</label>
+        <textarea id="stockNotes" placeholder="Any extra info — e.g. mixed colors breakdown, supplier, special instructions…"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="cancelAddStock">Cancel</button>
+      <button class="btn btn-green" id="confirmAddStock">✓ Add to today's arrivals</button>
+    </div>
+  </div>
+</div>
+
+<!-- Signature Modal -->
+<div class="modal-overlay" id="sigModal">
+  <div class="modal sig-modal" style="max-width:600px;">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">Customer signature</div>
+        <div class="modal-subtitle" id="sigCustomer"></div>
+      </div>
+      <button class="modal-close" id="closeSig">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--ink-mute);margin-bottom:10px;">Customer signs here to confirm delivery / install.</p>
+      <canvas id="sigCanvas" width="540" height="220"></canvas>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="sigClear">↻ Clear</button>
+      <button class="btn" id="sigCancel">Cancel</button>
+      <button class="btn btn-green" id="sigSave">✓ Save signature</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox for photos -->
+<div class="lightbox" id="lightbox">
+  <button class="close-lb" id="closeLightbox">✕</button>
+  <img id="lightboxImg" alt="">
+</div>
+
+<!-- Mobile floating action button -->
+<button class="fab" id="fabAdd" title="Add arrival">+</button>
+
+<!-- Bulk action bar -->
+<div class="bulk-bar" id="bulkBar">
+  <span class="count" id="bulkCount">0 selected</span>
+  <button class="bulk-primary" id="bulkArrived">✓ Mark arrived</button>
+  <button id="bulkSchedule">📅 Schedule</button>
+  <button id="bulkDelivered">🚚 Mark delivered</button>
+  <button id="bulkInstalled">🔧 Mark installed</button>
+  <button id="bulkUnmarkArrived" title="Unmark as arrived (for accidental marks)">↩️ Unmark arrived</button>
+  <span class="spacer"></span>
+  <button class="bulk-clear" id="bulkClear">Clear selection</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+// ════════════════════════════════════════════════════════════
+// FIREBASE — Same project as Invoice Tracker (centralized DB)
+// ════════════════════════════════════════════════════════════
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js';
+import { getDatabase, ref, onValue, push, set, remove, update, get } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js';
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAG6k-VLWPfYF2xq989j8PUUCySL8MIyLU",
+  authDomain: "invoice-daily-f170e.firebaseapp.com",
+  databaseURL: "https://invoice-daily-f170e-default-rtdb.firebaseio.com",
+  projectId: "invoice-daily-f170e",
+  storageBucket: "invoice-daily-f170e.firebasestorage.app",
+  messagingSenderId: "660377797408",
+  appId: "1:660377797408:web:f90ffe0c821ce09ff20d45",
+  measurementId: "G-WVPTSMFS72"
+};
+const COVERS_PATH = 'coversTracker/covers';
+const CUSTOMERS_PATH = 'invoiceTracker/customers'; // SHARED with Invoice Tracker
+const META_PATH = 'coversTracker/meta';
+const INVOICE_TRACKER_URL = 'https://aspenservices.github.io/invoice-tracker/';
+
+// Daily Cover Activity Report — recipients (per Alberto: "a todos")
+const DAILY_REPORT_TO = 'service1@aspenspas.com';
+const DAILY_REPORT_CC = [
+  'manu@aspenspas.com',     // Manuela Bania (Purchasing + Marketing)
+  'peyton@aspenspas.com',   // Peyton Bania
+  'dan@aspenspas.com',      // Dan Boelhauf
+  'lana@aspenspas.com',     // Lana Bania
+  'seth@aspenspas.com',     // Seth Bounds
+  'neil@aspenspas.com',     // Neil
+  'service@aspenspas.com',  // Service - Aspen Spas
+  'tom@aspenspas.com',      // Tom (owner)
+  'sam@aspenspas.com',      // Sam (owner)
+].join('; ');
+
+let db = null;
+let firebaseReady = false;
+let useLocalStorage = false;     // fallback when Firebase unavailable
+let suppressRemoteSync = false;  // prevent echo loop when local saves trigger remote that triggers re-render
+let sharedCustomers = [];        // from invoiceTracker/customers — reused for autocomplete
+
+// User identity for change log (prompt on first use, persist in localStorage)
+function getCurrentUser(){
+  let name = localStorage.getItem('aspen_user_name');
+  if(!name){
+    name = prompt('Welcome! What\'s your name? (used to track who made changes)', '');
+    if(name && name.trim()){
+      name = name.trim();
+      localStorage.setItem('aspen_user_name', name);
+    } else {
+      name = 'Anonymous';
+    }
+  }
+  return name;
+}
+
+// Log a change in a cover's history array
+function logChange(o, action, details){
+  if(!o) return;
+  if(!Array.isArray(o.history)) o.history = [];
+  o.history.push({
+    at: new Date().toISOString(),
+    who: localStorage.getItem('aspen_user_name') || 'Anonymous',
+    action,
+    ...(details || {}),
+  });
+  // Keep history bounded to last 50 entries (Firebase node size limit)
+  if(o.history.length > 50) o.history = o.history.slice(-50);
+}
+
+const STORAGE_KEY  = 'aspen_covers_real_v2';
+const STORAGE_META = 'aspen_covers_real_meta_v2';
+
+let allCovers = [];
+let view = [];
+let activeFilter = null;
+let primaryFilter = 'ACTIVE'; // ACTIVE | ARCHIVE | STOCK_ONLY | null(=all)
+let sortKey = null, sortDir = 1;
+let changeCount = 0;
+let selectedIds = new Set();   // for bulk select
+let lastUndoableAction = null; // {type, data, restore: () => void}
+
+const $  = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+function toast(msg, type){const t=$('#toast');t.textContent=msg;t.className='toast show'+(type?' '+type:'');setTimeout(()=>t.classList.remove('show'),1800);}
+function excelDate(v){
+  if(v==null||v==='')return null;
+  if(v instanceof Date)return isNaN(v)?null:v;
+  if(typeof v==='number'){const e=new Date(Date.UTC(1899,11,30));return new Date(e.getTime()+v*86400000);}
+  const d=new Date(v);return isNaN(d)?null:d;
+}
+function fmtDate(d){if(!d)return '—';return d.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});}
+function fmtDateShort(d){if(!d)return '—';return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+function fmtDateLong(d){if(!d)return '—';return d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});}
+function toISODate(d){if(!d)return '';return d.toISOString().slice(0,10);}
+function todayStart(){const d=new Date();d.setHours(0,0,0,0);return d;}
+function todayCheckedInStr(){const d=todayStart();return `Here ${d.getMonth()+1}/${d.getDate()}`;}
+function daysBetween(a,b){return Math.floor((b-a)/86400000);}
+function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+/* ==================== PARSING ==================== */
+function readWorkbook(file){
+  const r = new FileReader();
+  r.onload = async e => {
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data,{type:'array',cellDates:true});
+      let sheetName = wb.SheetNames.find(n => /^covers$/i.test(n.trim()))
+                   || wb.SheetNames.find(n => /covers/i.test(n) && !/stock/i.test(n));
+      if(!sheetName){ toast('⚠️ Could not find a "Covers" sheet'); return; }
+      const sheet = wb.Sheets[sheetName];
+      const aoa = XLSX.utils.sheet_to_json(sheet,{header:1,raw:true});
+
+      let hdrIdx = -1;
+      for(let i=0;i<Math.min(aoa.length,15);i++){
+        const row = aoa[i] || [];
+        const hasCheckedIn = row.some(c => /checked\s*in/i.test(String(c||'')));
+        const hasCustomerHdr = row[1] && /customer/i.test(String(row[1]));
+        const hasOrderDate = row[2] && /order\s*date/i.test(String(row[2]));
+        if(hasCheckedIn || (hasCustomerHdr && hasOrderDate)){ hdrIdx = i; break; }
+      }
+      if(hdrIdx === -1){ toast('⚠️ Could not find header row'); return; }
+
+      const dataRows = aoa.slice(hdrIdx + 1);
+      const parsed = [];
+      for(const row of dataRows){
+        if(!row || row.every(c => c==null || c==='')) continue;
+        const checkedIn = String(row[0]||'').trim();
+        const customer  = String(row[1]||'').trim();
+        const poRaw     = row[3];
+        const poNumber  = (poRaw==null||poRaw==='') ? '' : String(poRaw).trim();
+        if(!customer && !poNumber) continue;
+        const o = {
+          id: 'r_'+parsed.length+'_'+Date.now(),
+          checkedIn, customer,
+          orderDate: excelDate(row[2]),
+          poNumber,
+          notes: String(row[4]||'').trim(),
+          estShipDate: excelDate(row[5]),
+          shipDate: excelDate(row[6]),
+          expectedRecDate: excelDate(row[7]),
+          tracking: String(row[8]||'').trim(),
+          received: row[9],
+          called: String(row[10]||'').trim(),
+          isStock: false,
+          qty: null,
+          modified: false,
+          addedByUser: false,
+          excelRow: parsed.length,  // preserve Excel order (0, 1, 2, ...)
+          deliveryDate: null,
+          deliveryWindow: '',     // e.g. "9 AM - 11 AM"
+          deliveryAddress: '',
+          deliveryTech: '',
+          deliveryNotes: '',
+          internalNotes: '',      // team notes, NOT overwritten by Excel
+          spaSerial: '',          // linked spa serial number (cross-link with warehouse)
+          // Workflow timestamps
+          scheduledAt: null,
+          outForDeliveryAt: null,
+          deliveredAt: null,
+          installedAt: null,
+          // Snooze (when task is complete or set aside)
+          snoozedAt: null,
+          // History of changes
+          history: [],
+          // Media (base64 — will migrate to Firebase Storage in next iteration)
+          photos: [],
+          signature: '',
+        };
+        o.category = categorize(o);
+        parsed.push(o);
+      }
+
+      // If Firebase is connecting/ready, do MERGE flow (don't blindly replace local with Excel).
+      // If Firebase is unavailable, replace local with Excel as before.
+      const fbMode = (firebaseReady || (db && !useLocalStorage));
+      if(fbMode){
+        // Don't touch allCovers yet — let the merge function decide.
+        // Suppress auto-push during the merge dialog.
+        suppressRemoteSync = true;
+        toast(`📂 Excel parsed: ${parsed.length} covers — checking Firebase…`);
+        // The merge function will set allCovers and push manually.
+        await offerFirebaseMigration(parsed);
+        suppressRemoteSync = false;
+      } else {
+        // Pure local mode (no Firebase)
+        allCovers = parsed;
+        changeCount = 0;
+        saveToStorage(file.name);
+        render();
+        toast(`✅ Loaded ${parsed.length} covers from "${sheetName}" (local only)`,'success');
+      }
+    } catch(err){ console.error(err); toast('⚠️ Could not parse file'); }
+  };
+  r.readAsArrayBuffer(file);
+}
+
+async function offerFirebaseMigration(parsedFromExcel){
+  // Wait up to 6 seconds for Firebase to be ready
+  let waited = 0;
+  while(!firebaseReady && !useLocalStorage && waited < 6000){
+    await new Promise(r => setTimeout(r, 200));
+    waited += 200;
+  }
+  if(!firebaseReady || useLocalStorage || !db){
+    toast('ℹ️ Firebase not ready — Excel data is only saved locally for now');
+    return;
+  }
+
+  // Read current Firebase state directly (don't trust local mirror)
+  let fbArray = [];
+  try {
+    const snap = await get(ref(db, COVERS_PATH));
+    const data = snap.val() || {};
+    fbArray = Object.entries(data).map(([id, v]) => rehydrateCover({id, ...v}));
+  } catch(e){
+    console.error('[Merge] Could not read Firebase:', e);
+    toast('⚠️ Could not read Firebase — try again');
+    return;
+  }
+
+  // Index Firebase covers by normalized PO# and by composite key (for covers without PO#)
+  const normalizePO = po => String(po||'').trim().toUpperCase().replace(/\s+/g,'');
+  const compositeKey = c => {
+    // For covers without PO#: customer (cleaned) + orderDate
+    const name = String(c.customer || c.customerName || '').toLowerCase().split('—')[0].trim();
+    const date = c.orderDate ? (new Date(c.orderDate)).toISOString().slice(0,10) : '';
+    return name && date ? `${name}|${date}` : null;
+  };
+  const fbByPO = {};
+  const fbByComposite = {};
+  fbArray.forEach(c => {
+    const po = normalizePO(c.poNumber);
+    if(po) fbByPO[po] = c;
+    else {
+      const ck = compositeKey(c);
+      if(ck) fbByComposite[ck] = c;
+    }
+  });
+
+  // Track which Firebase entries we've matched so we don't double-add
+  const matchedFbIds = new Set();
+
+  let updatedCount = 0;
+  let newCount = 0;
+  const mergedById = {};
+
+  for(const excelCover of parsedFromExcel){
+    const po = normalizePO(excelCover.poNumber);
+    let fbMatch = po ? fbByPO[po] : null;
+    // Fallback: match by customer name + orderDate when no PO#
+    if(!fbMatch && !po){
+      const ck = compositeKey(excelCover);
+      if(ck) fbMatch = fbByComposite[ck];
+    }
+    if(fbMatch){
+      // MERGE: Excel wins for Excel-fields; Firebase wins for app-fields
+      const merged = {
+        ...excelCover,
+        id: fbMatch.id,             // keep Firebase ID
+        excelRow: excelCover.excelRow,  // preserve order from current Excel
+        // App-only fields preserved from Firebase
+        deliveryDate: fbMatch.deliveryDate || null,
+        deliveryWindow: fbMatch.deliveryWindow || '',
+        deliveryAddress: fbMatch.deliveryAddress || '',
+        deliveryTech: fbMatch.deliveryTech || '',
+        deliveryNotes: fbMatch.deliveryNotes || '',
+        internalNotes: fbMatch.internalNotes || '',
+        spaSerial: fbMatch.spaSerial || '',
+        history: fbMatch.history || [],
+        customerPhone: fbMatch.customerPhone || '',
+        customerEmail: fbMatch.customerEmail || '',
+        customerName: fbMatch.customerName || excelCover.customer,
+        scheduledAt: fbMatch.scheduledAt || null,
+        outForDeliveryAt: fbMatch.outForDeliveryAt || null,
+        deliveredAt: fbMatch.deliveredAt || null,
+        installedAt: fbMatch.installedAt || null,
+        snoozedAt: fbMatch.snoozedAt || null,
+        photos: fbMatch.photos || [],
+        signature: fbMatch.signature || '',
+        modified: fbMatch.modified || false,
+      };
+      merged.category = categorize(merged);
+      mergedById[fbMatch.id] = merged;
+      matchedFbIds.add(fbMatch.id);
+      updatedCount++;
+    } else {
+      // NEW from Excel
+      mergedById[excelCover.id] = excelCover;
+      newCount++;
+    }
+  }
+
+  // What's left in Firebase but NOT matched → keep (manual entries, stock, etc.)
+  let preservedCount = 0;
+  fbArray.forEach(c => {
+    if(matchedFbIds.has(c.id)) return;
+    if(mergedById[c.id]) return;
+    mergedById[c.id] = c;
+    preservedCount++;
+  });
+
+  const total = Object.keys(mergedById).length;
+  const msg =
+`Merge Excel with Firebase database:
+
+• ${updatedCount} cover${updatedCount===1?'':'s'} updated from Excel
+   (delivery info, photos, status preserved)
+• ${newCount} new cover${newCount===1?'':'s'} added from Excel
+• ${preservedCount} manually-added cover${preservedCount===1?'':'s'} kept
+
+Total after merge: ${total} covers
+
+Proceed? (Cancel to keep Firebase as-is)`;
+
+  if(!confirm(msg)){
+    // User canceled — RESTORE from Firebase (discard the Excel data we loaded)
+    allCovers = fbArray;
+    saveToStorage(); // re-save FB state to localStorage
+    // The onValue listener will overwrite on next snapshot anyway
+    render();
+    toast('Cancelled — kept Firebase data', 'info');
+    return;
+  }
+
+  // Apply merge: replace allCovers with the merged result
+  allCovers = Object.values(mergedById);
+  // Re-categorize everything (Excel may have changed received/notes)
+  allCovers.forEach(o => o.category = categorize(o));
+  // Push to Firebase (this is intentional REPLACE because we just merged in memory)
+  const ok = await pushAllToFirebase();
+  saveToStorage(null, {skipPush: true}); // Already pushed above, just save local cache
+  render();
+  if(ok) toast(`☁️ Merged · ${updatedCount} updated · ${newCount} new · ${preservedCount} preserved`, 'success');
+  else toast('⚠️ Push failed — data is local only');
+}
+
+function categorize(o){
+  const today = todayStart();
+  const notesU = (o.notes || '').toUpperCase();
+  const receivedU = String(o.received||'').trim().toUpperCase();
+  const arrived = !!o.checkedIn;
+  // Stock items have their own flow
+  if(o.isStock) return arrived ? 'STOCK' : 'PENDING';
+  // INSTALLED — highest priority (workflow complete)
+  if(o.installedAt) return 'INSTALLED';
+  // OUT FOR DELIVERY — tech is en route
+  if(o.outForDeliveryAt && !o.deliveredAt) return 'OUT FOR DELIVERY';
+  // DELIVERED (green in Albert's Excel) — cover left warehouse to customer.
+  if(o.deliveredAt) return 'DELIVERED';
+  // Strong signals from Excel: notes "DEL"/"DELIVERED" OR received "YES"/"DELIVERED"/"PICK UP".
+  if(/^DEL\b|DELIVERED/.test(notesU)) return 'DELIVERED';
+  if(/^YES\b|DELIVERED|PICK\s*UP/.test(receivedU)) return 'DELIVERED';
+  // SCHEDULED — has delivery date set, not yet out
+  if(o.deliveryDate && arrived) return 'SCHEDULED';
+  if(/DROP\s*SHIP/.test(notesU)) return 'DROP SHIP';
+  if(arrived){
+    if(/SND/.test(notesU)) return 'SND';
+    if(/STOCK/.test(notesU)) return 'STOCK';
+    return 'ARRIVED';
+  }
+  if(o.expectedRecDate && o.expectedRecDate < today) return 'LATE';
+  if(o.expectedRecDate && daysBetween(today, o.expectedRecDate) <= 7) return 'EXPECTED';
+  if(o.shipDate) return 'IN TRANSIT';
+  if(o.estShipDate && o.estShipDate < today) return 'LATE';
+  return 'PENDING';
+}
+
+/* ==================== STORAGE ==================== */
+function saveToStorage(fileName, opts){
+  opts = opts || {};
+  try{
+    const ser = allCovers.map(o => ({...o,
+      orderDate: o.orderDate?.toISOString(),
+      estShipDate: o.estShipDate?.toISOString(),
+      shipDate: o.shipDate?.toISOString(),
+      expectedRecDate: o.expectedRecDate?.toISOString(),
+      deliveryDate: o.deliveryDate?.toISOString(),
+      scheduledAt: o.scheduledAt?.toISOString?.() || o.scheduledAt,
+      outForDeliveryAt: o.outForDeliveryAt?.toISOString?.() || o.outForDeliveryAt,
+      deliveredAt: o.deliveredAt?.toISOString?.() || o.deliveredAt,
+      installedAt: o.installedAt?.toISOString?.() || o.installedAt,
+    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(ser));
+    if(fileName){
+      const cur = JSON.parse(localStorage.getItem(STORAGE_META)||'{}');
+      localStorage.setItem(STORAGE_META, JSON.stringify({...cur, fileName, loadedAt: new Date().toISOString(), changeCount}));
+    } else {
+      const cur = JSON.parse(localStorage.getItem(STORAGE_META)||'{}');
+      localStorage.setItem(STORAGE_META, JSON.stringify({...cur, changeCount}));
+    }
+    // Sync to Firebase (debounced) — only if Firebase is ready and not in local-only mode
+    // skipPush=true is used after intentional merge operations where data was already pushed
+    if(firebaseReady && !useLocalStorage && !opts.skipPush){
+      clearTimeout(saveToStorage._fbTimer);
+      saveToStorage._fbTimer = setTimeout(() => pushAllToFirebase(), 400);
+    }
+  }catch(e){console.error(e);}
+}
+function loadFromStorage(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw)return false;
+    allCovers = JSON.parse(raw).map(o => ({...o,
+      orderDate: o.orderDate ? new Date(o.orderDate):null,
+      estShipDate: o.estShipDate ? new Date(o.estShipDate):null,
+      shipDate: o.shipDate ? new Date(o.shipDate):null,
+      expectedRecDate: o.expectedRecDate ? new Date(o.expectedRecDate):null,
+      deliveryDate: o.deliveryDate ? new Date(o.deliveryDate) : null,
+      scheduledAt: o.scheduledAt ? new Date(o.scheduledAt) : null,
+      outForDeliveryAt: o.outForDeliveryAt ? new Date(o.outForDeliveryAt) : null,
+      deliveredAt: o.deliveredAt ? new Date(o.deliveredAt) : null,
+      installedAt: o.installedAt ? new Date(o.installedAt) : null,
+      photos: o.photos || [],
+      signature: o.signature || '',
+    }));
+    allCovers.forEach(o => o.category = categorize(o));
+    const meta = JSON.parse(localStorage.getItem(STORAGE_META)||'{}');
+    changeCount = meta.changeCount || 0;
+    return true;
+  }catch{return false;}
+}
+
+/* ==================== EDIT OPERATIONS ==================== */
+function toggleArrived(idx){
+  const o = allCovers[idx];
+  if(!o) return;
+  if(o.checkedIn){
+    o.checkedIn = '';
+  } else {
+    o.checkedIn = todayCheckedInStr();
+  }
+  o.modified = true;
+  o.category = categorize(o);
+  changeCount++;
+  saveToStorage();
+  render();
+  toast(o.checkedIn ? `✅ ${o.customer} marked as arrived` : `Unmarked ${o.customer}`, o.checkedIn?'success':'');
+}
+
+function markDelivered(idx){
+  const o = allCovers[idx];
+  if(!o) return;
+  // Make sure it was checked in first
+  if(!o.checkedIn) o.checkedIn = todayCheckedInStr();
+  const dateStr = todayCheckedInStr().replace('Here ','');
+  o.received = `YES Delivered ${dateStr}`;
+  o.deliveryDate = todayStart();
+  o.deliveredAt = new Date();
+  o.modified = true;
+  o.category = categorize(o);
+  logChange(o, 'delivered', {tech: o.deliveryTech});
+  changeCount++;
+  saveToStorage();
+  render();
+  toast(`🚚 ${o.customer} marked DELIVERED — fill destination & tech →`, 'success');
+}
+
+function markScheduled(idx){
+  const o = allCovers[idx];
+  if(!o) return;
+  if(!o.checkedIn) o.checkedIn = todayCheckedInStr();
+  if(!o.deliveryDate) o.deliveryDate = new Date(todayStart().getTime() + 86400000); // tomorrow default
+  o.scheduledAt = new Date();
+  o.modified = true;
+  o.category = categorize(o);
+  logChange(o, 'scheduled', {date: o.deliveryDate?.toISOString()?.slice(0,10), tech: o.deliveryTech});
+  changeCount++;
+  saveToStorage();
+  render();
+  toast(`📅 ${o.customer} scheduled for delivery`, 'success');
+}
+
+function markOutForDelivery(idx){
+  const o = allCovers[idx];
+  if(!o) return;
+  o.outForDeliveryAt = new Date();
+  o.modified = true;
+  o.category = categorize(o);
+  logChange(o, 'out_for_delivery', {tech: o.deliveryTech});
+  changeCount++;
+  saveToStorage();
+  render();
+  toast(`🚐 ${o.customer} — tech is out for delivery`, 'success');
+}
+
+function markInstalled(idx){
+  const o = allCovers[idx];
+  if(!o) return;
+  if(!o.deliveredAt) o.deliveredAt = new Date();
+  o.installedAt = new Date();
+  const dateStr = todayCheckedInStr().replace('Here ','');
+  o.received = `YES Installed ${dateStr}`;
+  o.modified = true;
+  o.category = categorize(o);
+  logChange(o, 'installed', {tech: o.deliveryTech});
+  changeCount++;
+  saveToStorage();
+  render();
+  toast(`🔧 ${o.customer} — install complete`, 'success');
+}
+
+// Returns age in days since the cover was ordered (orderDate). null if no orderDate.
+function orderAgeDays(o){
+  if(!o.orderDate) return null;
+  const d = o.orderDate instanceof Date ? o.orderDate : new Date(o.orderDate);
+  if(isNaN(d.getTime())) return null;
+  return daysBetween(d, todayStart());
+}
+
+function isOldOrder(o, thresholdDays){
+  const age = orderAgeDays(o);
+  return age !== null && age >= (thresholdDays || 60);
+}
+
+// Unmark a cover as arrived (clear checkedIn) — for fixing accidentally marked covers
+function unmarkArrived(idx){
+  const o = allCovers[idx];
+  if(!o) return;
+  if(!o.checkedIn){ toast('ℹ️ This cover is not marked as arrived'); return; }
+  // Confirm if it has further workflow timestamps (would break consistency)
+  if(o.deliveredAt || o.installedAt){
+    if(!confirm(`This cover is already marked as delivered/installed. Are you sure you want to unmark its arrival?`)) return;
+  }
+  o.checkedIn = '';
+  o.modified = true;
+  o.category = categorize(o);
+  logChange(o, 'unmarked_arrived');
+  changeCount++;
+  saveToStorage();
+  render();
+  toast(`↩️ ${o.customer} — arrival unmarked`, 'success');
+}
+
+function snoozeCover(idx, reason){
+  const o = allCovers[idx];
+  if(!o) return;
+  o.snoozedAt = new Date();
+  if(reason) o.snoozeReason = reason;
+  o.modified = true;
+  logChange(o, 'snoozed', {reason: reason || ''});
+  changeCount++;
+  saveToStorage();
+  render();
+  toast(`💤 ${o.customer} snoozed${reason?' — '+reason:''}`, 'success');
+}
+
+function unsnoozeCover(idx){
+  const o = allCovers[idx];
+  if(!o) return;
+  o.snoozedAt = null;
+  o.snoozeReason = null;
+  o.modified = true;
+  logChange(o, 'unsnoozed');
+  changeCount++;
+  saveToStorage();
+  render();
+  toast(`↻ ${o.customer} unsnoozed`, 'success');
+}
+
+function rollbackStatus(idx, toStatus){
+  const o = allCovers[idx];
+  if(!o) return;
+  // Clear forward timestamps
+  if(toStatus === 'ARRIVED'){
+    o.scheduledAt = null; o.outForDeliveryAt = null; o.deliveredAt = null; o.installedAt = null;
+    o.deliveryDate = null;
+    if(/YES/i.test(String(o.received||''))) o.received = '';
+  } else if(toStatus === 'SCHEDULED'){
+    o.outForDeliveryAt = null; o.deliveredAt = null; o.installedAt = null;
+    if(/YES/i.test(String(o.received||''))) o.received = '';
+  } else if(toStatus === 'OUT FOR DELIVERY'){
+    o.deliveredAt = null; o.installedAt = null;
+    if(/YES/i.test(String(o.received||''))) o.received = '';
+  } else if(toStatus === 'DELIVERED'){
+    o.installedAt = null;
+  }
+  o.modified = true;
+  o.category = categorize(o);
+  changeCount++;
+  saveToStorage();
+  render();
+  toast(`↻ Rolled back to ${toStatus}`);
+}
+
+/* ============ PHOTO UPLOAD ============ */
+function addPhotoToActiveCover(file){
+  if(!file) return;
+  const idx = window._activeDrawerIdx;
+  if(idx === undefined) return;
+  const o = allCovers[idx];
+  if(!o) return;
+  // Read & resize image (compress to ~1024px max, JPEG 80% quality, base64)
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 1024;
+      let w = img.width, h = img.height;
+      if(w > maxDim || h > maxDim){
+        if(w > h){ h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = c.toDataURL('image/jpeg', 0.8);
+      if(!o.photos) o.photos = [];
+      o.photos.push({dataUrl, addedAt: new Date().toISOString()});
+      o.modified = true;
+      changeCount++;
+      saveToStorage();
+      render();
+      openDrawer(idx);
+      toast('📷 Photo added','success');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removePhoto(idx, photoIdx){
+  const o = allCovers[idx];
+  if(!o || !o.photos) return;
+  o.photos.splice(photoIdx, 1);
+  o.modified = true;
+  changeCount++;
+  saveToStorage();
+  render();
+  openDrawer(idx);
+}
+
+function openLightbox(dataUrl){
+  $('#lightboxImg').src = dataUrl;
+  $('#lightbox').classList.add('open');
+}
+function closeLightbox(){ $('#lightbox').classList.remove('open'); }
+
+/* ============ SIGNATURE ============ */
+function openSignatureModal(idx){
+  window._activeSigIdx = idx;
+  const o = allCovers[idx];
+  $('#sigCustomer').textContent = `${o.customer} · PO# ${o.poNumber || '—'}`;
+  $('#sigModal').classList.add('open');
+  setTimeout(initSignatureCanvas, 100);
+}
+
+function initSignatureCanvas(){
+  const canvas = $('#sigCanvas');
+  const ctx = canvas.getContext('2d');
+  // Resize to fit container
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = Math.min(rect.width - 56, 800);
+  canvas.height = 220;
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#0A1A3A';
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  let drawing = false;
+  let last = null;
+  const getPos = e => {
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return {x: t.clientX - r.left, y: t.clientY - r.top};
+  };
+  const start = e => { e.preventDefault(); drawing = true; last = getPos(e); };
+  const move = e => {
+    if(!drawing) return; e.preventDefault();
+    const p = getPos(e);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    last = p;
+  };
+  const end = () => { drawing = false; };
+
+  canvas.onmousedown = start;
+  canvas.onmousemove = move;
+  canvas.onmouseup = end;
+  canvas.onmouseleave = end;
+  canvas.ontouchstart = start;
+  canvas.ontouchmove = move;
+  canvas.ontouchend = end;
+}
+
+function clearSignature(){
+  const canvas = $('#sigCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+
+function saveSignature(){
+  const idx = window._activeSigIdx;
+  const o = allCovers[idx];
+  if(!o) return;
+  const canvas = $('#sigCanvas');
+  // Check if canvas has content (not pure white)
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0,0,canvas.width,canvas.height);
+  let hasInk = false;
+  for(let i = 0; i < imageData.data.length; i += 4){
+    if(imageData.data[i] < 240 || imageData.data[i+1] < 240 || imageData.data[i+2] < 240){
+      hasInk = true; break;
+    }
+  }
+  if(!hasInk){ toast('⚠️ Please draw the signature first'); return; }
+  o.signature = canvas.toDataURL('image/png');
+  o.modified = true;
+  changeCount++;
+  saveToStorage();
+  render();
+  closeSignatureModal();
+  openDrawer(idx);
+  toast('✓ Signature saved','success');
+}
+
+function closeSignatureModal(){ $('#sigModal').classList.remove('open'); }
+
+/* ============ TECH-TICKETS DEEP LINK ============ */
+function openInTechTickets(idx, mode){
+  const o = allCovers[idx];
+  if(!o) return;
+  // Auto-detect mode if not provided
+  if(!mode) mode = (o.deliveredAt || o.installedAt) ? 'install' : 'schedule';
+
+  const customer = (o.customer || '').split('—')[0].trim();
+  const po = String(o.poNumber || '');
+
+  let type, notes;
+  if(mode === 'schedule'){
+    type = 'cover_delivery_schedule';
+    const lines = [
+      '📦 Cover arrived at warehouse — pending delivery schedule.',
+      `Customer: ${customer}`,
+      `PO# ${po || 'N/A'}`,
+      `Arrived: ${o.checkedIn || 'today'}`,
+    ];
+    if(o.spaSerial) lines.push(`Linked spa: ${o.spaSerial}`);
+    if(o.deliveryAddress) lines.push(`Destination: ${o.deliveryAddress}`);
+    if(o.customerPhone) lines.push(`Customer phone: ${o.customerPhone}`);
+    if(o.notes) lines.push(`Notes: ${o.notes}`);
+    lines.push('');
+    lines.push('👉 Manager to coordinate delivery date with customer and assign tech.');
+    notes = lines.join('\n');
+  } else {
+    type = 'cover_install';
+    notes = `Cover delivered ${fmtDate(o.deliveryDate || o.deliveredAt)}. Destination: ${o.deliveryAddress||'TBD'}. Tech: ${o.deliveryTech||'TBD'}.${o.deliveryNotes ? ' Notes: '+o.deliveryNotes : ''}`;
+  }
+
+  const params = new URLSearchParams({
+    new: '1',
+    type: type,
+    customer: customer,
+    po: po,
+    notes: notes,
+    tech: o.deliveryTech || '',
+    phone: o.customerPhone || '',
+  });
+  const url = `https://aspenservices.github.io/TECH-TICKETS/?${params.toString()}`;
+  window.open(url, '_blank');
+  toast(mode === 'schedule'
+    ? '🎫 Pending ticket added to Service Log — manager will schedule'
+    : '🎫 Install ticket pre-filled');
+  // Log this action
+  logChange(o, 'ticket_created', {mode});
+  saveToStorage();
+}
+
+function unmarkDelivered(idx){
+  const o = allCovers[idx];
+  if(!o) return;
+  o.received = '';
+  o.modified = true;
+  o.category = categorize(o);
+  changeCount++;
+  saveToStorage();
+  render();
+  toast(`↻ Delivery undone for ${o.customer}`);
+}
+
+function updateCover(idx, patch){
+  const o = allCovers[idx];
+  if(!o) return;
+  // Track which fields actually changed for the history log
+  const changed = [];
+  for(const k of Object.keys(patch)){
+    if(o[k] !== patch[k] && k !== 'modified'){
+      changed.push(k);
+    }
+  }
+  Object.assign(o, patch);
+  o.modified = true;
+  o.category = categorize(o);
+  if(changed.length){
+    logChange(o, 'edited', {field: changed.join(', ')});
+  }
+  changeCount++;
+  saveToStorage();
+  render();
+}
+
+function deleteCover(idx){
+  const o = allCovers[idx];
+  if(!o) return;
+  if(!confirm(`Remove "${o.customer}" from the list?`)) return;
+  // Snapshot for undo
+  const snapshot = JSON.parse(JSON.stringify(o));
+  const wasAtIdx = idx;
+  const deletedId = o.id;
+  allCovers.splice(idx,1);
+  changeCount++;
+  saveToStorage();
+  // Explicitly remove from Firebase (otherwise pushAllToFirebase only writes existing ids)
+  if(firebaseReady && !useLocalStorage) deleteCoverFromFirebase(deletedId);
+  render();
+  closeDrawer();
+  showUndoToast(`🗑️ Removed ${o.customer}`, () => {
+    allCovers.splice(wasAtIdx, 0, snapshot);
+    changeCount++;
+    saveToStorage();
+    render();
+  });
+}
+
+/* Build a customer-facing SMS / email body */
+function buildSmsBody(o){
+  const name = (o.customerName || o.customer || '').split('—')[0].trim();
+  const dateStr = o.deliveryDate ? fmtDate(o.deliveryDate) : 'soon';
+  const windowStr = o.deliveryWindow ? ` between ${o.deliveryWindow}` : '';
+  const techStr = o.deliveryTech ? `\n\nYour technician will be ${o.deliveryTech}.` : '';
+  return `Hi ${name}, this is Aspen Spas Service. Your cover is ready and scheduled for delivery on ${dateStr}${windowStr}.${techStr}\n\nIf you have any questions, please call us at (314) 776-5050.\n\n— Aspen Spas`;
+}
+
+function addStockEntry({model, color, qty, po, tracking, notes}){
+  // Build a display name that handles "unknown" model or color gracefully
+  const parts = ['STOCK'];
+  if(model || color){
+    const desc = [model, color].filter(Boolean).join(' ').trim();
+    parts.push('—', desc || '(unspecified)');
+  }
+  if(qty > 1) parts.push(`×${qty}`);
+  const display = parts.join(' ');
+  const userNotes = notes ? notes.trim() : '';
+  const o = {
+    id: 'stock_'+Date.now(),
+    checkedIn: todayCheckedInStr(),
+    customer: display,
+    orderDate: todayStart(),
+    poNumber: po || '',
+    notes: 'STOCK' + (userNotes ? ' — '+userNotes : ''),
+    estShipDate: null,
+    shipDate: null,
+    expectedRecDate: null,
+    tracking: tracking || '',
+    received: null,
+    called: '',
+    isStock: true,
+    qty: qty,
+    model, color,
+    modified: true,
+    addedByUser: true,
+    deliveryDate: null,
+    deliveryWindow: '',
+    deliveryAddress: '',
+    deliveryTech: '',
+    deliveryNotes: '',
+    scheduledAt: null,
+    outForDeliveryAt: null,
+    deliveredAt: null,
+    installedAt: null,
+    photos: [],
+    signature: '',
+  };
+  o.category = categorize(o);
+  allCovers.unshift(o);
+  changeCount++;
+  saveToStorage();
+  render();
+  const friendlyDesc = model || color ? `${model||'?'} ${color||'?'}`.trim() : 'stock';
+  toast(`✅ Stock added: ${friendlyDesc} ×${qty}`,'success');
+}
+
+function addCustomerEntry({customer, po, model, color, qty, tracking, notes, dealer, dropShip, phone, email}){
+  // Customer name is required; model and color are optional
+  if(!customer || !customer.trim()){
+    toast('⚠️ Customer name is required');
+    return false;
+  }
+  qty = parseInt(qty,10) || 1;
+  // Compose display name (only add product info if known)
+  const desc = [model, color].filter(Boolean).join(' ').trim();
+  const qtyStr = qty > 1 ? ` ×${qty}` : '';
+  const display = desc ? `${customer} — ${desc}${qtyStr}` : `${customer}${qtyStr}`;
+  // Compose notes with type flags
+  const flagParts = [];
+  if(dealer && dropShip) flagParts.push('DEALER/DROP SHIP');
+  else if(dealer) flagParts.push('DEALER');
+  else if(dropShip) flagParts.push('DROP SHIP');
+  const userNotes = notes ? notes.trim() : '';
+  const fullNotes = [flagParts.join(''), userNotes].filter(Boolean).join(' — ');
+
+  const o = {
+    id: 'cust_'+Date.now(),
+    checkedIn: todayCheckedInStr(),
+    customer: display,
+    customerName: customer.trim(),
+    orderDate: todayStart(),
+    poNumber: po || '',
+    notes: fullNotes,
+    estShipDate: null,
+    shipDate: null,
+    expectedRecDate: null,
+    tracking: tracking || '',
+    received: null,
+    called: '',
+    isStock: false,
+    qty: qty,
+    model: model || '',
+    color: color || '',
+    customerPhone: phone || '',
+    customerEmail: email || '',
+    modified: true,
+    addedByUser: true,
+    deliveryDate: null,
+    deliveryWindow: '',
+    deliveryAddress: '',
+    deliveryTech: '',
+    deliveryNotes: '',
+    scheduledAt: null,
+    outForDeliveryAt: null,
+    deliveredAt: null,
+    installedAt: null,
+    photos: [],
+    signature: '',
+  };
+  o.category = categorize(o);
+  allCovers.unshift(o);
+  changeCount++;
+  saveToStorage();
+  render();
+  toast(`✅ ${customer}${qty>1?' ×'+qty:''} added to today's arrivals`,'success');
+  return true;
+}
+
+/* ==================== RENDER ==================== */
+function render(){
+  if(!allCovers.length){
+    $('#emptyState').classList.remove('hidden');
+    $('#dashboard').classList.add('hidden');
+    $('#fileName').classList.add('hidden');
+    $('#addStockBtn').classList.add('hidden');
+    $('#exportXlsxBtn').classList.add('hidden');
+    return;
+  }
+  $('#emptyState').classList.add('hidden');
+  $('#dashboard').classList.remove('hidden');
+  $('#addStockBtn').classList.remove('hidden');
+  $('#exportXlsxBtn').classList.remove('hidden');
+  $('#weeklyReportBtn').classList.remove('hidden');
+  $('#cleanExcelBtn').classList.remove('hidden');
+  $('#deliveredReportBtn').classList.remove('hidden');
+
+  const meta = JSON.parse(localStorage.getItem(STORAGE_META)||'{}');
+  if(meta.fileName){ $('#fileName').textContent = meta.fileName; $('#fileName').classList.remove('hidden'); }
+  if(meta.loadedAt){
+    const d = new Date(meta.loadedAt);
+    $('#lastSync').textContent = `· loaded ${fmtDateShort(d)}, ${d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
+  }
+  if(changeCount > 0){
+    $('#changesBadge').classList.remove('hidden');
+    $('#changesBadge').innerHTML = `<span class="changes-badge">${changeCount} unsaved change${changeCount===1?'':'s'} · click Export Excel</span>`;
+  } else {
+    $('#changesBadge').classList.add('hidden');
+  }
+
+  renderKPIs();
+  renderEmail();
+  renderFilterChips();
+  applyFilters();
+  checkCriticalBanner();
+  // Restore special note value if set
+  setTimeout(() => {
+    const noteInput = document.getElementById('emailSpecialNote');
+    if(noteInput) noteInput.value = localStorage.getItem('aspen_email_note') || '';
+  }, 50);
+}
+
+function checkCriticalBanner(){
+  const today = todayStart();
+  const critical = allCovers.filter(o => {
+    if(!o.checkedIn) return false;
+    if(o.category === 'DELIVERED' || o.category === 'INSTALLED') return false;
+    if(shouldAutoSnooze(o, today)) return false;
+    return daysInWarehouse(o, today) >= 45;
+  });
+  const banner = $('#criticalBanner');
+  if(!banner) return;
+  if(critical.length === 0){
+    banner.classList.add('hidden');
+    return;
+  }
+  banner.classList.remove('hidden');
+  const oldest = Math.max(...critical.map(o => daysInWarehouse(o, today)));
+  $('#criticalText').innerHTML = `
+    <strong>${critical.length} cover${critical.length===1?'':'s'}</strong>
+    waiting in the warehouse 45+ days
+    (oldest: <strong>${oldest} days</strong>).
+    Decide: was it already delivered, picked up, or still pending?
+  `;
+  $('#criticalAction').onclick = () => {
+    primaryFilter = 'CRITICAL';
+    activeFilter = null;
+    renderKPIs(); renderFilterChips(); applyFilters();
+    document.querySelector('.section-title')?.scrollIntoView({behavior:'smooth', block:'start'});
+  };
+  $('#criticalEmail').onclick = () => emailCriticalToCelia(critical);
+}
+
+/* ==================== EMAIL ACTIONS ==================== */
+function emailCriticalToCelia(criticalCovers){
+  const today = todayStart();
+  const list = criticalCovers
+    .sort((a,b) => daysInWarehouse(b, today) - daysInWarehouse(a, today))
+    .map(o => {
+      const days = daysInWarehouse(o, today);
+      const customer = String(o.customer || '—').split('—')[0].trim();
+      const po = o.poNumber || '—';
+      const phone = o.customerPhone || 'no phone on file';
+      return `• ${customer} (PO# ${po}) — ${days} days waiting · ${phone}`;
+    }).join('\n');
+
+  const subject = `Action needed: ${criticalCovers.length} cover${criticalCovers.length===1?'':'s'} 45+ days in warehouse`;
+  const body =
+`Hi Celia,
+
+The following ${criticalCovers.length} cover${criticalCovers.length===1?' has':'s have'} been waiting in the warehouse for 45 days or more.
+Please call each customer to confirm: was it already delivered/picked up, still pending, or should we mark it differently?
+
+${list}
+
+After each call, please update the status in the Covers Tracker dashboard.
+
+Dashboard: ${location.href}
+
+Thanks,
+${localStorage.getItem('aspen_user_name') || 'Service Department'}`;
+
+  const mailto = `mailto:celia@aspenspas.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailto;
+  toast('📧 Opening email to Celia…','success');
+}
+
+function emailWeeklyReport(){
+  const today = todayStart();
+  const weekAgo = new Date(today.getTime() - 7 * 86400000);
+
+  // Count activity last 7 days
+  const arrivedThisWeek = allCovers.filter(o => {
+    if(!o.checkedIn) return false;
+    const m = o.checkedIn.match(/(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?/);
+    if(!m) return false;
+    const mo = parseInt(m[1],10), dy = parseInt(m[2],10);
+    let yr = m[3] ? parseInt(m[3],10) : today.getFullYear();
+    if(yr < 100) yr += 2000;
+    const d = new Date(yr, mo-1, dy);
+    return d >= weekAgo && d <= today;
+  });
+  const deliveredThisWeek = allCovers.filter(o => {
+    if(!o.deliveredAt) return false;
+    const d = new Date(o.deliveredAt);
+    return d >= weekAgo && d <= today;
+  });
+  const installedThisWeek = allCovers.filter(o => {
+    if(!o.installedAt) return false;
+    const d = new Date(o.installedAt);
+    return d >= weekAgo && d <= today;
+  });
+
+  // Avg turnaround (arrival → delivery) for this week
+  const turnarounds = deliveredThisWeek.map(o => {
+    if(!o.checkedIn || !o.deliveredAt) return null;
+    const m = o.checkedIn.match(/(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?/);
+    if(!m) return null;
+    const mo = parseInt(m[1],10), dy = parseInt(m[2],10);
+    let yr = m[3] ? parseInt(m[3],10) : today.getFullYear();
+    if(yr < 100) yr += 2000;
+    const arrived = new Date(yr, mo-1, dy);
+    return daysBetween(arrived, new Date(o.deliveredAt));
+  }).filter(x => x !== null);
+  const avgTurnaround = turnarounds.length
+    ? (turnarounds.reduce((a,b) => a+b, 0) / turnarounds.length).toFixed(1)
+    : 'n/a';
+
+  // Critical pending
+  const critical = allCovers.filter(o => {
+    if(!o.checkedIn) return false;
+    if(o.category === 'DELIVERED' || o.category === 'INSTALLED') return false;
+    if(shouldAutoSnooze(o, today)) return false;
+    return daysInWarehouse(o, today) >= 45;
+  });
+  // By tech
+  const byTech = {};
+  deliveredThisWeek.forEach(o => {
+    const t = o.deliveryTech || 'Unassigned';
+    byTech[t] = (byTech[t] || 0) + 1;
+  });
+  const techBreakdown = Object.entries(byTech)
+    .sort((a,b) => b[1] - a[1])
+    .map(([t,n]) => `  • ${t}: ${n}`).join('\n') || '  • (no deliveries logged)';
+
+  const subject = `Weekly Cover Activity Report — week ending ${fmtDateShort(today)}`;
+  const body =
+`Hi Tom,
+
+Here's the cover activity summary for the past 7 days:
+
+ACTIVITY
+• ${arrivedThisWeek.length} covers arrived at warehouse
+• ${deliveredThisWeek.length} covers delivered to customers
+• ${installedThisWeek.length} covers installed (complete)
+• Average turnaround (arrival → delivery): ${avgTurnaround} days
+
+DELIVERIES BY TECH
+${techBreakdown}
+
+OUTSTANDING — needs attention
+• ${critical.length} cover${critical.length===1?'':'s'} 45+ days in warehouse (critical)
+
+Dashboard: ${location.href}
+
+— ${localStorage.getItem('aspen_user_name') || 'Service Department'}`;
+
+  const mailto = `mailto:tom@aspenspas.com?cc=sam@aspenspas.com&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailto;
+  toast('📧 Opening weekly report email…','success');
+}
+
+function renderKPIs(){
+  const today = todayStart();
+  const inWarehouse  = allCovers.filter(o => o.category === 'ARRIVED' || o.category==='SND').length;
+  const arrivedToday = allCovers.filter(o => isCheckedInToday(o.checkedIn) && o.category!=='DELIVERED' && !o.isStock).length;
+  const delivered    = allCovers.filter(o => o.category === 'DELIVERED').length;
+  const deliveredToday = allCovers.filter(o => o.category === 'DELIVERED' && isDeliveredToday(o)).length;
+  const stockTotal   = allCovers.filter(o => o.isStock || o.category === 'STOCK').length;
+  const stockToday   = allCovers.filter(o => (o.isStock || o.category==='STOCK') && isCheckedInToday(o.checkedIn)).length;
+  const pending      = allCovers.filter(o => o.category === 'PENDING' || o.category==='EXPECTED' || o.category==='IN TRANSIT' || o.category==='LATE').length;
+  const late         = allCovers.filter(o => o.category === 'LATE').length;
+
+  const data = [
+    {key:'PENDING',   label:'Pending arrival',n: pending,        sub:`${late} late · waiting`,             cls:'k-pending'},
+    {key:'ARRIVED',   label:'In warehouse',   n: inWarehouse,    sub:`${arrivedToday} arrived today`,      cls:'k-arrived'},
+    {key:'DELIVERED', label:'Delivered',      n: delivered,      sub:`${deliveredToday} delivered today`, cls:'k-delivered'},
+    {key:'STOCK',     label:'Stock',          n: stockTotal,     sub:`${stockToday} added today`,         cls:'k-stock'},
+    {key:'DROP SHIP', label:'Drop shipped',   n: allCovers.filter(o=>o.category==='DROP SHIP').length, sub:'not through warehouse', cls:'k-dropship'},
+  ];
+  $('#kpiGrid').innerHTML = data.map(d => `
+    <div class="kpi ${d.cls} ${activeFilter===d.key?'active':''}" data-filter="${d.key}">
+      <div class="kpi-label">${d.label}</div>
+      <div class="kpi-value">${d.n}</div>
+      <div class="kpi-sublabel">${d.sub}</div>
+    </div>
+  `).join('');
+  $$('.kpi').forEach(el => el.addEventListener('click', () => {
+    const f = el.dataset.filter;
+    // Navigate to the right view based on which KPI
+    if(f === 'DELIVERED')        { primaryFilter = 'ARCHIVE';   activeFilter = null; }
+    else if(f === 'STOCK')       { primaryFilter = 'STOCK_ONLY';activeFilter = null; }
+    else if(f === 'DROP SHIP')   { primaryFilter = null;        activeFilter = (activeFilter==='DROP SHIP') ? null : 'DROP SHIP'; }
+    else                         { primaryFilter = 'ACTIVE';    activeFilter = (activeFilter === f) ? null : f; }
+    renderKPIs(); renderFilterChips(); applyFilters();
+  }));
+}
+
+function isDeliveredToday(o){
+  if(!o.received) return false;
+  const txt = String(o.received);
+  const today = todayStart();
+  const m = txt.match(/(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?/);
+  if(!m) return false;
+  const month = parseInt(m[1],10), day = parseInt(m[2],10);
+  let year = m[3] ? parseInt(m[3],10) : today.getFullYear();
+  if(year < 100) year += 2000;
+  return month === today.getMonth()+1 && day === today.getDate() && year === today.getFullYear();
+}
+
+/* ==================== EMAIL ==================== */
+function isCheckedInToday(text){
+  if(!text) return false;
+  const today = todayStart();
+  const m = text.match(/(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?/);
+  if(!m) return false;
+  const month = parseInt(m[1],10), day = parseInt(m[2],10);
+  let year = m[3] ? parseInt(m[3],10) : today.getFullYear();
+  if(year < 100) year += 2000;
+  return month === today.getMonth()+1 && day === today.getDate() && year === today.getFullYear();
+}
+function isCheckedInWithin(text, days){
+  if(!text) return false;
+  const today = todayStart();
+  const m = text.match(/(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?/);
+  if(!m) return false;
+  const month = parseInt(m[1],10), day = parseInt(m[2],10);
+  let year = m[3] ? parseInt(m[3],10) : today.getFullYear();
+  if(year < 100) year += 2000;
+  const d = new Date(year, month-1, day);
+  return daysBetween(d, today) <= days && d <= today;
+}
+
+function buildEmailHTML(){
+  const today = todayStart();
+  const dateStr = fmtDateLong(today);
+
+  // Customer covers from the shipment list that arrived today (originally in Excel, not added manually)
+  const arrivedFromList = allCovers.filter(o =>
+    isCheckedInToday(o.checkedIn) && !o.isStock && o.category !== 'DELIVERED' && !o.addedByUser
+  );
+  // Covers added manually today (NOT on the original shipment list)
+  const arrivedNotInList = allCovers.filter(o =>
+    isCheckedInToday(o.checkedIn) && !o.isStock && o.category !== 'DELIVERED' && o.addedByUser
+  );
+  // Delivered to customer today (becomes service tickets)
+  const deliveredToday = allCovers.filter(o => o.category === 'DELIVERED' && isDeliveredToday(o) && !o.isStock);
+  // Stock items received today
+  const stockToday = allCovers.filter(o => (o.isStock || o.category === 'STOCK') && isCheckedInToday(o.checkedIn));
+  // SND still in warehouse
+  const sndInWarehouse = allCovers.filter(o => o.category === 'SND');
+  // Special note from user (saved in localStorage)
+  const specialNote = localStorage.getItem('aspen_email_note') || '';
+
+  // Helper: count REAL covers (respecting qty) instead of rows
+  const coverQty = o => Math.max(1, parseInt(o.qty,10) || 1);
+  const sumQty = arr => arr.reduce((s,o) => s + coverQty(o), 0);
+
+  const qtyFromList = sumQty(arrivedFromList);
+  const qtyNotInList = sumQty(arrivedNotInList);
+  const qtyStock = sumQty(stockToday);
+  const qtyDelivered = sumQty(deliveredToday);
+  const totalArrivedCovers = qtyFromList + qtyNotInList;
+  const totalReceivedToday = totalArrivedCovers + qtyStock;
+
+  let html = `
+<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#0A1A3A;line-height:1.55;background:white;">
+
+  <!-- Header -->
+  <div style="padding:32px 36px 22px;border-bottom:2px solid #0A1A3A;">
+    <div style="font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:600;color:#0A1A3A;letter-spacing:-0.01em;margin-bottom:4px;">Aspen Spas</div>
+    <div style="font-size:10.5px;font-weight:600;color:#B8924C;letter-spacing:0.15em;text-transform:uppercase;">Service Department · Daily Cover Activity Report</div>
+    <div style="margin-top:16px;font-size:14px;color:#6B7390;font-weight:500;">${dateStr}</div>
+  </div>
+
+  <!-- Opening greeting -->
+  <div style="padding:24px 36px 4px;">
+    <p style="margin:0 0 10px;font-size:15px;color:#0A1A3A;font-weight:500;">Dear all,</p>
+    <p style="margin:0 0 14px;font-size:14px;color:#2E3856;line-height:1.65;">
+      ${totalReceivedToday > 0
+        ? `It is my pleasure to inform you that today we received <strong>${totalReceivedToday} item${totalReceivedToday===1?'':'s'}</strong> in the warehouse:`
+        : (qtyDelivered > 0
+            ? `Below is today's activity summary.`
+            : `No new covers received today, but here is today's activity summary.`)}
+    </p>
+
+    ${totalReceivedToday > 0 ? `
+      <!-- Breakdown summary box -->
+      <div style="background:#F8F6F0;border-left:3px solid #B8924C;padding:12px 16px;border-radius:0 6px 6px 0;font-size:13.5px;color:#0A1A3A;line-height:1.85;">
+        ${qtyFromList > 0 ? `<div>🟠 <strong>${qtyFromList} customer cover${qtyFromList===1?'':'s'}</strong> from today's shipment list</div>` : ''}
+        ${qtyNotInList > 0 ? `<div>🟠 <strong>${qtyNotInList} customer cover${qtyNotInList===1?'':'s'}</strong> arrived but ${qtyNotInList===1?'was':'were'} <em>not</em> on the shipment list</div>` : ''}
+        ${qtyStock > 0 ? `<div>🟡 <strong>${qtyStock} stock unit${qtyStock===1?'':'s'}</strong> for warehouse inventory</div>` : ''}
+        ${qtyDelivered > 0 ? `<div>🟢 <strong>${qtyDelivered} cover${qtyDelivered===1?'':'s'}</strong> delivered to customer${qtyDelivered===1?'':'s'} today</div>` : ''}
+        <div style="margin-top:6px;padding-top:6px;border-top:1px solid #E8E4DA;font-weight:600;">
+          Total received today: ${totalReceivedToday} item${totalReceivedToday===1?'':'s'}
+          ${totalArrivedCovers > 0 && qtyStock > 0 ? ` (${totalArrivedCovers} customer + ${qtyStock} stock)` : ''}
+        </div>
+      </div>
+    ` : ''}
+  </div>
+`;
+
+  // SECTION 1: Covers from the shipment list (these were expected)
+  // Split between recent orders (typical) and old orders (60+ days, finally arriving)
+  if(arrivedFromList.length){
+    const recentArrivals = arrivedFromList.filter(o => !isOldOrder(o, 60));
+    const oldArrivals    = arrivedFromList.filter(o =>  isOldOrder(o, 60));
+
+    if(recentArrivals.length){
+      const qtyRecent = sumQty(recentArrivals);
+      html += `
+        <div style="padding:22px 36px 12px;">
+          <div style="font-family:Georgia,serif;font-size:15px;font-weight:600;color:#0A1A3A;margin-bottom:6px;">
+            🟠 Covers from today's shipment list
+          </div>
+          <p style="margin:0 0 10px;font-size:12.5px;color:#6B7390;font-style:italic;">
+            ${qtyRecent} cover${qtyRecent===1?'':'s'} across ${recentArrivals.length} customer order${recentArrivals.length===1?'':'s'}
+          </p>
+          ${emailTable(recentArrivals, ['checkedIn','customer','qty','orderDate','poNumber','flagNotes'])}
+        </div>
+      `;
+    }
+
+    if(oldArrivals.length){
+      const qtyOld = sumQty(oldArrivals);
+      html += `
+        <div style="padding:22px 36px 12px;">
+          <div style="font-family:Georgia,serif;font-size:15px;font-weight:600;color:#A06030;margin-bottom:6px;">
+            📅 Old orders finally arriving today
+          </div>
+          <p style="margin:0 0 10px;font-size:12.5px;color:#6B7390;font-style:italic;">
+            ${qtyOld} cover${qtyOld===1?'':'s'} from order${oldArrivals.length===1?'':'s'} placed 60+ days ago — please verify these are correct
+          </p>
+          ${emailTable(oldArrivals, ['checkedIn','customer','qty','orderDate','poNumber','flagNotes'])}
+        </div>
+      `;
+    }
+  }
+
+  // SECTION 2: Covers added that were NOT on the list
+  if(arrivedNotInList.length){
+    html += `
+      <div style="padding:22px 36px 12px;">
+        <p style="margin:0 0 10px;font-size:14px;color:#2E3856;line-height:1.65;font-style:italic;">
+          Additionally, <strong>${qtyNotInList} cover${qtyNotInList===1?'':'s'}</strong> arrived that ${qtyNotInList===1?'was':'were'} <strong>not</strong> included on the shipment list
+          ${arrivedNotInList.length !== qtyNotInList ? ` (across ${arrivedNotInList.length} customer order${arrivedNotInList.length===1?'':'s'})` : ''}:
+        </p>
+        ${emailTable(arrivedNotInList, ['checkedIn','customer','qty','orderDate','poNumber','flagNotes'])}
+      </div>
+    `;
+  }
+
+  // SECTION 3: Delivered to customer (with full delivery info)
+  if(deliveredToday.length){
+    html += `
+      <div style="padding:22px 36px 12px;">
+        <div style="font-family:Georgia,serif;font-size:15px;font-weight:600;color:#1F6E48;margin-bottom:10px;">
+          🟢 Delivered to customer today
+        </div>
+        <p style="margin:0 0 12px;font-size:13px;color:#2E3856;line-height:1.6;">
+          The following customer cover${qtyDelivered===1?' was':'s were'} delivered today and will become service ticket${qtyDelivered===1?'':'s'} for install follow-up.
+        </p>
+        ${deliveryDetailTable(deliveredToday)}
+      </div>
+    `;
+  }
+
+  // SECTION 4: Stock units
+  if(stockToday.length){
+    html += `
+      <div style="padding:22px 36px 12px;">
+        <div style="font-family:Georgia,serif;font-size:15px;font-weight:600;color:#B8924C;margin-bottom:6px;">
+          🟡 Stock units received today
+        </div>
+        <p style="margin:0 0 10px;font-size:12.5px;color:#6B7390;font-style:italic;">
+          ${qtyStock} unit${qtyStock===1?'':'s'} for warehouse inventory
+        </p>
+        ${emailTable(stockToday, ['checkedIn','customer','qty','poNumber','tracking','flagNotes'])}
+      </div>
+    `;
+  }
+
+  // SECTION 5: SND
+  if(sndInWarehouse.length){
+    html += `
+      <div style="padding:22px 36px 12px;">
+        <div style="font-family:Georgia,serif;font-size:14px;font-weight:600;color:#C99A2E;margin-bottom:8px;">
+          🏚️ SND items still in warehouse — awaiting customer's spa delivery
+        </div>
+        ${emailTable(sndInWarehouse, ['customer','poNumber','checkedIn'])}
+      </div>
+    `;
+  }
+
+  // Special notes (editable by user — can be multiple lines)
+  if(specialNote && specialNote.trim()){
+    const noteLines = specialNote.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const noteHtml = noteLines.length > 1
+      ? '<ul style="margin:0;padding-left:20px;font-size:13px;color:#0A1A3A;line-height:1.7;">'
+        + noteLines.map(l => `<li style="margin-bottom:4px;">${escapeHtml(l)}</li>`).join('')
+        + '</ul>'
+      : `<div style="font-size:13px;color:#0A1A3A;line-height:1.6;font-style:italic;">${escapeHtml(noteLines[0]||'')}</div>`;
+    html += `
+      <div style="padding:18px 24px;background:#FAF1DE;margin:12px 36px;border-radius:8px;border-left:3px solid #B8924C;">
+        ${noteLines.length > 1 ? '<div style="font-size:11px;font-weight:700;color:#B8924C;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Important notes</div>' : ''}
+        ${noteHtml}
+      </div>
+    `;
+  }
+
+  // Closing
+  html += `
+    <div style="padding:20px 36px 32px;">
+      <p style="margin:18px 0 6px;font-size:14px;color:#0A1A3A;">Kind regards,</p>
+      <p style="margin:0;font-size:14px;color:#0A1A3A;font-weight:600;">Service Department</p>
+      <p style="margin:0;font-size:12px;color:#6B7390;">Aspen Spas</p>
+    </div>
+
+    <div style="padding:18px 36px;background:#0A1A3A;color:#FAFAF7;font-size:11.5px;text-align:center;letter-spacing:0.03em;">
+      <strong style="color:#D4AF37;">Aspen Spas</strong> · 4609 McRee Avenue, St. Louis, MO 63110 · (314) 776-5050
+    </div>
+
+  </div>
+  `;
+
+  return html;
+}
+
+/* Compact "shipment list" style table — mimics the user's original email */
+function emailTable(rows, cols){
+  const labels = {
+    checkedIn:'CHECKED IN', customer:'CUSTOMER', orderDate:'ORDER',
+    poNumber:'PO#', notes:'NOTES', tracking:'TRACKING', flagNotes:'TYPE', qty:'QTY'
+  };
+  let html = `<table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;border:1px solid #0A1A3A;background:#FAFAF7;">`;
+  html += '<thead><tr style="background:#0A1A3A;">';
+  cols.forEach(c => {
+    html += `<th style="text-align:left;padding:9px 11px;font-size:10px;font-weight:700;color:#FAFAF7;letter-spacing:0.06em;border-right:1px solid rgba(255,255,255,0.1);">${labels[c]||c.toUpperCase()}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+  rows.forEach((r,i) => {
+    const bg = i%2 ? '#FFFFFF' : '#FAFAF7';
+    html += `<tr style="background:${bg};">`;
+    cols.forEach(c => {
+      let v;
+      let style = `padding:9px 11px;font-size:12.5px;color:#0A1A3A;border-bottom:1px solid #E8E4DA;border-right:1px solid #E8E4DA;vertical-align:top;`;
+      if(c === 'customer'){
+        // Strip the " ×N" suffix from display since qty has its own column
+        v = (r.customer || '—').replace(/\s*×\s*\d+\s*$/, '');
+        style += 'font-weight:600;';
+      }
+      else if(c === 'qty'){
+        const q = Math.max(1, parseInt(r.qty,10) || 1);
+        if(q > 1){
+          v = '<span style="background:#FBE0D2;color:#C25A2E;padding:3px 9px;border-radius:100px;font-size:11.5px;font-weight:700;letter-spacing:0.02em;">×' + q + '</span>';
+        } else {
+          v = '<span style="color:#9A9A9A;font-size:12px;">1</span>';
+        }
+        style += 'text-align:center;width:50px;';
+      }
+      else if(c === 'checkedIn'){ v = r.checkedIn || '—'; style += "font-family:'SF Mono',Consolas,Monaco,monospace;font-size:11.5px;font-weight:600;"; }
+      else if(c === 'poNumber'){ v = r.poNumber || '—'; style += "font-family:'SF Mono',Consolas,Monaco,monospace;font-size:11.5px;"; }
+      else if(c === 'orderDate'){ v = fmtDateShort(r.orderDate); style += "font-family:'SF Mono',Consolas,Monaco,monospace;font-size:11.5px;color:#6B7390;"; }
+      else if(c === 'tracking'){ v = r.tracking || '—'; style += "font-family:'SF Mono',Consolas,Monaco,monospace;font-size:11.5px;color:#6B7390;"; }
+      else if(c === 'flagNotes'){
+        // Show DEALER / DROP SHIP / STOCK as colored tag
+        const n = String(r.notes||'').toUpperCase();
+        if(/DEALER.*DROP\s*SHIP/.test(n))  v = '<span style="background:#E9DFF6;color:#6B47A8;padding:2px 8px;border-radius:100px;font-size:10.5px;font-weight:700;letter-spacing:0.03em;">DEALER/DROP SHIP</span>';
+        else if(/DEALER/.test(n))           v = '<span style="background:#FBF1DA;color:#C99A2E;padding:2px 8px;border-radius:100px;font-size:10.5px;font-weight:700;letter-spacing:0.03em;">DEALER</span>';
+        else if(/DROP\s*SHIP/.test(n))      v = '<span style="background:#E9DFF6;color:#6B47A8;padding:2px 8px;border-radius:100px;font-size:10.5px;font-weight:700;letter-spacing:0.03em;">DROP SHIP</span>';
+        else if(/STOCK/.test(n))            v = '<span style="background:#FAF1DE;color:#B8924C;padding:2px 8px;border-radius:100px;font-size:10.5px;font-weight:700;letter-spacing:0.03em;">STOCK</span>';
+        else if(/SND/.test(n))              v = '<span style="background:#FBE0D2;color:#C25A2E;padding:2px 8px;border-radius:100px;font-size:10.5px;font-weight:700;letter-spacing:0.03em;">SND</span>';
+        else                                v = '<span style="color:#9A9A9A;font-size:11px;">—</span>';
+      }
+      else { v = r[c] || '—'; }
+      html += `<td style="${style}">${typeof v === 'string' && v.startsWith('<span') ? v : escapeHtml(v)}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+/* Delivery detail table — shows date, address, tech, notes */
+function deliveryDetailTable(rows){
+  let html = `<table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;border:1px solid #1F6E48;background:#FAFAF7;">`;
+  html += `<thead><tr style="background:#1F6E48;">
+    <th style="text-align:left;padding:9px 11px;font-size:10px;font-weight:700;color:white;letter-spacing:0.06em;">CUSTOMER</th>
+    <th style="text-align:left;padding:9px 11px;font-size:10px;font-weight:700;color:white;letter-spacing:0.06em;">PO#</th>
+    <th style="text-align:left;padding:9px 11px;font-size:10px;font-weight:700;color:white;letter-spacing:0.06em;">DELIVERY DATE</th>
+    <th style="text-align:left;padding:9px 11px;font-size:10px;font-weight:700;color:white;letter-spacing:0.06em;">DESTINATION</th>
+    <th style="text-align:left;padding:9px 11px;font-size:10px;font-weight:700;color:white;letter-spacing:0.06em;">TECH</th>
+  </tr></thead><tbody>`;
+  rows.forEach((r,i) => {
+    const bg = i%2 ? '#FFFFFF' : '#F1F8F3';
+    html += `<tr style="background:${bg};">
+      <td style="padding:10px 11px;font-size:12.5px;color:#0A1A3A;font-weight:600;border-bottom:1px solid #D7EFDF;">${escapeHtml(r.customer||'—')}</td>
+      <td style="padding:10px 11px;font-size:11.5px;color:#0A1A3A;font-family:'SF Mono',Consolas,Monaco,monospace;border-bottom:1px solid #D7EFDF;">${escapeHtml(String(r.poNumber||'—'))}</td>
+      <td style="padding:10px 11px;font-size:11.5px;color:#0A1A3A;font-family:'SF Mono',Consolas,Monaco,monospace;border-bottom:1px solid #D7EFDF;">${r.deliveryDate ? fmtDateShort(r.deliveryDate) : (r.received ? escapeHtml(String(r.received).replace(/YES\s*Delivered\s*/i,'')) : fmtDateShort(todayStart()))}</td>
+      <td style="padding:10px 11px;font-size:12px;color:#2E3856;border-bottom:1px solid #D7EFDF;">${escapeHtml(r.deliveryAddress || '—')}</td>
+      <td style="padding:10px 11px;font-size:12px;color:#2E3856;border-bottom:1px solid #D7EFDF;">${escapeHtml(r.deliveryTech || '—')}</td>
+    </tr>`;
+    if(r.deliveryNotes){
+      html += `<tr style="background:${bg};">
+        <td colspan="5" style="padding:6px 11px 10px;font-size:11.5px;color:#6B7390;font-style:italic;border-bottom:1px solid #D7EFDF;">
+          📝 ${escapeHtml(r.deliveryNotes)}
+        </td>
+      </tr>`;
+    }
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+function kpiBox(label, num, fg, bg){
+  return `<td width="25%" style="padding:0;">
+    <div style="margin:16px 8px;padding:16px 14px;background:${bg};border-radius:6px;text-align:center;">
+      <div style="font-size:10px;font-weight:700;color:${fg};text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">${label}</div>
+      <div style="font-family:Georgia,serif;font-size:30px;font-weight:600;color:${fg};line-height:1;">${num}</div>
+    </div>
+  </td>`;
+}
+function sectionStart(title, color, count){
+  return `
+    <div style="padding:24px 36px;border-top:1px solid #EEEAE0;">
+      <table cellpadding="0" cellspacing="0" border="0" style="width:100%;margin-bottom:14px;">
+        <tr>
+          <td style="width:6px;background:${color};border-radius:3px;"></td>
+          <td style="padding-left:12px;font-family:Georgia,serif;font-size:16px;font-weight:600;color:#0A1A3A;">${title}</td>
+          <td style="text-align:right;font-size:11px;color:#6B7390;font-weight:600;">
+            <span style="background:#F4F2EC;padding:3px 10px;border-radius:100px;">${count}</span>
+          </td>
+        </tr>
+      </table>
+  `;
+}
+function emptyNote(text){return `<div style="font-style:italic;color:#9A9A9A;font-size:13px;padding:8px 4px;">${text}</div>`;}
+function tableHTML(rows, cols){
+  const labels = {customer:'Customer',poNumber:'PO#',notes:'Notes',tracking:'Tracking',checkedIn:'Checked In',expectedRecDate:'Expected',shipDate:'Shipped',received:'Delivered'};
+  let html = `<table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin-top:6px;">`;
+  html += '<thead><tr>';
+  cols.forEach(c => {
+    html += `<th style="text-align:left;padding:8px 10px;font-size:10.5px;font-weight:700;color:#6B7390;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #EEEAE0;">${labels[c]||c}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+  rows.forEach(r => {
+    html += '<tr>';
+    cols.forEach(c => {
+      let v = r[c];
+      let style = "padding:10px;font-size:13px;color:#0A1A3A;border-bottom:1px solid #F4F2EC;vertical-align:top;";
+      if(c==='customer') style += 'font-weight:600;';
+      if(c==='poNumber' || c==='tracking' || c==='checkedIn' || c==='received') style += "font-family:'SF Mono',Consolas,Monaco,monospace;font-size:12px;color:#2E3856;";
+      if(c==='expectedRecDate' || c==='shipDate'){
+        v = fmtDateShort(v);
+        style += "font-family:'SF Mono',Consolas,Monaco,monospace;font-size:12px;color:#2E3856;";
+      } else if(v == null || v === ''){ v = '—'; }
+      else { v = String(v); }
+      html += `<td style="${style}">${escapeHtml(v)}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+function renderEmail(){ $('#emailPreview').innerHTML = buildEmailHTML(); renderNoteTemplates(); checkOldOrdersAlert(); }
+
+/* ==================== OLD ORDERS ALERT BANNER ==================== */
+function checkOldOrdersAlert(){
+  const wrap = $('#oldOrdersAlert');
+  if(!wrap) return;
+  // Find covers showing as "arrived today" but ordered 60+ days ago
+  const oldOnesToday = allCovers.filter(o =>
+    isCheckedInToday(o.checkedIn) && isOldOrder(o, 60)
+    && o.category !== 'DELIVERED' && o.category !== 'INSTALLED'
+  );
+  if(oldOnesToday.length === 0){
+    wrap.innerHTML = '';
+    return;
+  }
+  const names = oldOnesToday.slice(0,3).map(o => {
+    const name = String(o.customer||'').split('—')[0].trim();
+    const age = orderAgeDays(o);
+    return `<strong>${escapeHtml(name)}</strong> (${age}d old)`;
+  }).join(', ');
+  const more = oldOnesToday.length > 3 ? ` and ${oldOnesToday.length - 3} more` : '';
+
+  wrap.innerHTML = `
+    <div style="background:linear-gradient(135deg,#FFE5C4 0%,#FFCC91 100%);border:2px solid #C66A1F;border-radius:12px;padding:20px 24px;margin:0 0 22px 0;display:flex;align-items:center;gap:18px;flex-wrap:wrap;box-shadow:0 4px 14px rgba(198,106,31,0.18);animation:slideDown 0.4s ease-out;">
+      <span style="font-size:32px;line-height:1;">⚠️</span>
+      <div style="flex:1;min-width:240px;font-size:14px;color:#5C2A0C;line-height:1.55;">
+        <div style="font-weight:700;color:#A04518;font-size:15px;margin-bottom:4px;">
+          ${oldOnesToday.length} OLD order${oldOnesToday.length===1?'':'s'} marked as arrived today
+        </div>
+        <div style="font-size:13px;">
+          ${names}${more}
+        </div>
+        <div style="font-size:12px;margin-top:6px;color:#7A3E18;font-style:italic;">
+          If they didn't really arrive today, unmark them in one click ↓
+        </div>
+      </div>
+      <button id="unmarkAllOldBtn" style="background:#C66A1F;color:white;border:none;padding:12px 22px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(198,106,31,0.4);transition:all .15s;letter-spacing:0.02em;">
+        🔧 Unmark all (${oldOnesToday.length})
+      </button>
+    </div>
+  `;
+  $('#unmarkAllOldBtn').onclick = () => unmarkAllOldArrivals(oldOnesToday);
+  $('#unmarkAllOldBtn').onmouseover = (e) => { e.target.style.background = '#A04518'; e.target.style.transform = 'translateY(-1px)'; };
+  $('#unmarkAllOldBtn').onmouseout = (e) => { e.target.style.background = '#C66A1F'; e.target.style.transform = 'translateY(0)'; };
+}
+
+function unmarkAllOldArrivals(covers){
+  if(!confirm(`Unmark these ${covers.length} cover${covers.length===1?'':'s'} as arrived today?\n(They'll go back to "pending arrival" state. You can mark them as arrived later if needed.)`)){
+    return;
+  }
+  let count = 0;
+  covers.forEach(o => {
+    if(o.checkedIn){
+      o.checkedIn = '';
+      o.modified = true;
+      o.category = categorize(o);
+      logChange(o, 'unmarked_arrived', {bulk: true});
+      count++;
+    }
+  });
+  if(count > 0){
+    changeCount += count;
+    saveToStorage();
+    render();
+    toast(`↩️ Unmarked ${count} old order${count===1?'':'s'} from today's arrivals`, 'success');
+  }
+}
+
+/* ==================== EMAIL NOTE TEMPLATES ==================== */
+const NOTE_TEMPLATES = [
+  {
+    id: 'colorado-goodfellow',
+    label: '🏢 Colorado → Goodfellow B4',
+    text: 'Please note that the Colorado covers will be sent to Building 4 at Goodfellow.',
+    matches: () => allCovers.some(o =>
+      isCheckedInToday(o.checkedIn) &&
+      (/colorado/i.test(o.customer||'') || /colorado/i.test(o.model||''))
+    ),
+  },
+  {
+    id: 'paradise-goodfellow',
+    label: '🏢 Paradise → Goodfellow B4',
+    text: 'Please inform Shet and Mrs. Lana that the Paradise covers will be sent to Building 4 at Goodfellow.',
+    matches: () => allCovers.some(o =>
+      isCheckedInToday(o.checkedIn) && /paradise/i.test(o.customer||'')
+    ),
+  },
+  {
+    id: 'no-po',
+    label: '⚠️ Covers without PO',
+    text: 'Some covers arrived today without a PO number — please confirm with the warehouse before re-distribution.',
+    matches: () => allCovers.some(o =>
+      isCheckedInToday(o.checkedIn) && !o.poNumber && !o.isStock
+    ),
+  },
+  {
+    id: 'sample',
+    label: '✏️ Custom note…',
+    text: '',
+    matches: () => false,
+    customPrompt: true,
+  },
+];
+
+function renderNoteTemplates(){
+  const wrap = $('#noteTemplates');
+  if(!wrap) return;
+  wrap.innerHTML = NOTE_TEMPLATES.map(t => {
+    const suggested = !t.customPrompt && t.matches();
+    return `<button class="note-tpl ${suggested?'suggested':''}" data-tpl-id="${t.id}" title="${escapeHtml(t.text || 'Add a custom note')}">${t.label}${suggested?' ✨':''}</button>`;
+  }).join('');
+  wrap.querySelectorAll('.note-tpl').forEach(btn => {
+    btn.onclick = () => insertNoteTemplate(btn.dataset.tplId);
+  });
+
+  // Auto-suggest banner — if there's a suggested template and the note doesn't have it yet
+  const sgWrap = $('#noteAutoSuggest');
+  if(!sgWrap) return;
+  const ta = $('#emailSpecialNote');
+  const currentNote = (ta?.value || '').toLowerCase();
+  const suggestions = NOTE_TEMPLATES.filter(t =>
+    !t.customPrompt && t.matches() && !currentNote.includes(t.text.toLowerCase().slice(0, 30))
+  );
+  if(suggestions.length){
+    const s = suggestions[0];
+    sgWrap.innerHTML = `
+      <div class="note-suggest">
+        <span style="font-size:14px;">💡</span>
+        <span class="ns-text">Detected matching covers — add the <strong>${s.label}</strong> note?</span>
+        <button class="ns-action" id="acceptSuggest">Insert</button>
+        <button class="ns-dismiss" id="dismissSuggest" title="Dismiss">✕</button>
+      </div>
+    `;
+    sgWrap.querySelector('#acceptSuggest').onclick = () => insertNoteTemplate(s.id);
+    sgWrap.querySelector('#dismissSuggest').onclick = () => { sgWrap.innerHTML = ''; };
+  } else {
+    sgWrap.innerHTML = '';
+  }
+}
+
+function insertNoteTemplate(tplId){
+  const t = NOTE_TEMPLATES.find(x => x.id === tplId);
+  if(!t) return;
+  const ta = $('#emailSpecialNote');
+  if(!ta) return;
+
+  let textToInsert = t.text;
+  if(t.customPrompt){
+    const custom = prompt('Type your custom note:', '');
+    if(!custom) return;
+    textToInsert = custom.trim();
+  }
+
+  // Append to existing notes (don't replace) — add newline if there's existing content
+  const current = ta.value.trim();
+  if(current && !current.endsWith('\n')){
+    ta.value = current + '\n' + textToInsert;
+  } else if(current){
+    ta.value = current + textToInsert;
+  } else {
+    ta.value = textToInsert;
+  }
+  // Trigger input event so save + re-render kicks in
+  ta.dispatchEvent(new Event('input', {bubbles: true}));
+  ta.focus();
+  toast('✓ Note inserted','success');
+}
+
+/* ==================== TABLE & DRAWER ==================== */
+function renderFilterChips(){
+  const today = todayStart();
+  const criticalCount = allCovers.filter(o => {
+    if(!o.checkedIn) return false;
+    if(o.category === 'DELIVERED' || o.category === 'INSTALLED') return false;
+    if(shouldAutoSnooze(o, today)) return false;
+    return daysInWarehouse(o, today) >= 45;
+  }).length;
+  const staleCount = allCovers.filter(o => {
+    if(!o.checkedIn) return false;
+    if(o.category === 'DELIVERED' || o.category === 'INSTALLED') return false;
+    if(shouldAutoSnooze(o, today)) return false;
+    const d = daysInWarehouse(o, today);
+    return d >= 14 && d < 45;
+  }).length;
+  const snoozedCount = allCovers.filter(o => shouldAutoSnooze(o, today)).length;
+
+  const primaryChips = [
+    {f:'ACTIVE', label:'🔵 Active (in flow)'},
+    {f:'ARCHIVE', label:'🟢 Archive (delivered)'},
+    {f:'STOCK_ONLY', label:'🟡 Stock only'},
+    {f:'STALE', label:`⏰ Stale 14-45d${staleCount?' · '+staleCount:''}`},
+    {f:'CRITICAL', label:`🚨 Critical 45d+${criticalCount?' · '+criticalCount:''}`},
+    {f:'SNOOZED', label:`💤 Snoozed${snoozedCount?' · '+snoozedCount:''}`},
+    {f:null, label:'All'},
+  ];
+  const catChips = ['ARRIVED','SCHEDULED','OUT FOR DELIVERY','PENDING','LATE','EXPECTED','DROP SHIP','SND','DELIVERED','INSTALLED','STOCK'];
+  $('#filterChips').innerHTML =
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-right:12px;padding-right:12px;border-right:1px solid var(--line);">'
+    + primaryChips.map(c => `<div class="chip ${primaryFilter===c.f?'active':''}" data-pf="${c.f===null?'null':c.f}">${c.label}</div>`).join('')
+    + '</div>'
+    + catChips.map(c => `<div class="chip ${activeFilter===c?'active':''}" data-f="${c}">${c}</div>`).join('')
+    + '<button class="btn btn-sm" id="exportFilteredBtn" style="margin-left:auto;">📥 Export filtered</button>';
+  $$('#filterChips .chip').forEach(el => el.addEventListener('click', () => {
+    if(el.dataset.pf !== undefined){
+      const pf = el.dataset.pf === 'null' ? null : el.dataset.pf;
+      primaryFilter = pf;
+      activeFilter = null;
+    } else if(el.dataset.f !== undefined){
+      activeFilter = activeFilter === el.dataset.f ? null : el.dataset.f;
+    }
+    renderKPIs(); renderFilterChips(); applyFilters();
+  }));
+  const exp = $('#exportFilteredBtn');
+  if(exp) exp.onclick = exportFilteredXlsx;
+}
+
+// Compute how many days a cover has been in the warehouse waiting (since checkedIn)
+function daysInWarehouse(o, today){
+  if(!o.checkedIn) return 0;
+  const m = o.checkedIn.match(/(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?/);
+  if(!m) return 0;
+  const mo = parseInt(m[1],10), dy = parseInt(m[2],10);
+  let yr = m[3] ? parseInt(m[3],10) : today.getFullYear();
+  if(yr < 100) yr += 2000;
+  return daysBetween(new Date(yr, mo-1, dy), today);
+}
+
+// Auto-snooze: covers in terminal state (INSTALLED) for long enough should hide from active view
+function shouldAutoSnooze(o, today){
+  if(o.snoozedAt) return true; // manually snoozed
+  if(o.category === 'INSTALLED' && o.installedAt){
+    const d = new Date(o.installedAt);
+    if(daysBetween(d, today) >= 7) return true;
+  }
+  if(o.category === 'DELIVERED' && o.deliveredAt){
+    const d = new Date(o.deliveredAt);
+    if(daysBetween(d, today) >= 14) return true;
+  }
+  return false;
+}
+
+function applyFilters(){
+  const q = $('#searchInput').value.trim().toLowerCase();
+  const today = todayStart();
+  view = allCovers.filter(o => {
+    const snoozed = shouldAutoSnooze(o, today);
+    // Primary filter: ACTIVE / ARCHIVE / STOCK_ONLY / STALE / CRITICAL / SNOOZED / null
+    if(primaryFilter === 'ACTIVE'){
+      // Active = in flow, not snoozed, not delivered/installed (recent ones still in flow), not stock
+      if(o.category === 'DELIVERED' || o.category === 'INSTALLED' || o.isStock || o.category === 'STOCK') return false;
+      if(snoozed) return false;
+    } else if(primaryFilter === 'ARCHIVE'){
+      if(o.category !== 'DELIVERED' && o.category !== 'INSTALLED') return false;
+    } else if(primaryFilter === 'SNOOZED'){
+      if(!snoozed) return false;
+    } else if(primaryFilter === 'STOCK_ONLY'){
+      if(!(o.isStock || o.category === 'STOCK')) return false;
+    } else if(primaryFilter === 'STALE'){
+      // Stale = arrived 14-45 days ago, still in warehouse
+      if(!o.checkedIn) return false;
+      if(o.category === 'DELIVERED' || o.category === 'INSTALLED') return false;
+      if(snoozed) return false;
+      const days = daysInWarehouse(o, today);
+      if(days < 14 || days >= 45) return false;
+    } else if(primaryFilter === 'CRITICAL'){
+      // Critical = arrived 45+ days ago, still in warehouse
+      if(!o.checkedIn) return false;
+      if(o.category === 'DELIVERED' || o.category === 'INSTALLED') return false;
+      if(snoozed) return false;
+      if(daysInWarehouse(o, today) < 45) return false;
+    }
+    if(activeFilter){
+      if(activeFilter==='ARRIVED'){ if(!o.checkedIn || o.category==='DELIVERED' || o.category==='INSTALLED') return false; }
+      else { if(o.category !== activeFilter) return false; }
+    }
+    if(q){
+      const hay = [o.customer, o.poNumber, o.notes, o.tracking, o.checkedIn].map(x => String(x||'').toLowerCase()).join(' ');
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  if(sortKey){
+    view.sort((a,b)=>{
+      let av=a[sortKey], bv=b[sortKey];
+      if(av instanceof Date) av=av.getTime();
+      if(bv instanceof Date) bv=bv.getTime();
+      if(av==null||av==='') return 1;
+      if(bv==null||bv==='') return -1;
+      if(av<bv) return -1*sortDir;
+      if(av>bv) return 1*sortDir;
+      return 0;
+    });
+  } else {
+    // Default sort: respect Excel order, with manually-added covers at top
+    view.sort((a,b) => {
+      const aHas = a.excelRow !== undefined && a.excelRow !== null;
+      const bHas = b.excelRow !== undefined && b.excelRow !== null;
+      if(!aHas && !bHas) return 0;       // both manual: keep insertion order
+      if(!aHas) return -1;                // a is manual, goes first
+      if(bHas && a.excelRow < b.excelRow) return -1;
+      if(bHas && a.excelRow > b.excelRow) return 1;
+      return 0;
+    });
+  }
+  renderTable();
+}
+
+function statusClass(s){if(!s)return '';return 's-'+s.replace(/\s+/g,'').toUpperCase();}
+
+/* ==================== HISTORY FORMATTING ==================== */
+function formatHistoryAction(h){
+  const actions = {
+    created: 'created',
+    marked_arrived: 'marked as arrived',
+    unmarked_arrived: 'unmarked arrived',
+    scheduled: `scheduled${h.date?' for '+h.date:''}${h.tech?' (tech: '+h.tech+')':''}`,
+    out_for_delivery: `marked out for delivery${h.tech?' (tech: '+h.tech+')':''}`,
+    delivered: `marked delivered${h.tech?' (tech: '+h.tech+')':''}`,
+    installed: `marked installed${h.tech?' (tech: '+h.tech+')':''}`,
+    snoozed: `snoozed${h.reason?' — '+h.reason:''}`,
+    unsnoozed: 'unsnoozed',
+    edited: `edited ${h.field || 'fields'}`,
+    photo_added: 'added photo',
+    signature_captured: 'captured customer signature',
+  };
+  return actions[h.action] || h.action;
+}
+function fmtHistoryDate(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  const today = todayStart();
+  const isToday = d.toDateString() === today.toDateString();
+  const yesterday = new Date(today.getTime() - 86400000);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+  const time = d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  if(isToday) return `Today, ${time}`;
+  if(isYesterday) return `Yesterday, ${time}`;
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + `, ${time}`;
+}
+
+/* ==================== CUSTOMER HISTORY MODAL ==================== */
+function openCustomerHistory(customerName){
+  const clean = String(customerName||'').split('—')[0].trim();
+  if(!clean){ toast('No customer name to search'); return; }
+  // Find all covers for this customer (case-insensitive partial match)
+  const cleanLower = clean.toLowerCase();
+  const matches = allCovers.filter(c => {
+    const n = String(c.customer||c.customerName||'').toLowerCase().split('—')[0].trim();
+    return n === cleanLower || n.includes(cleanLower) || cleanLower.includes(n);
+  });
+  if(matches.length === 0){ toast('No covers found for ' + clean); return; }
+  // Show modal
+  const modalHtml = `
+    <div style="background:white;border-radius:var(--radius-lg);max-width:760px;width:100%;max-height:80vh;overflow:auto;box-shadow:var(--shadow-h);">
+      <div style="padding:22px 28px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-family:Fraunces,Georgia,serif;font-size:22px;font-weight:600;">${escapeHtml(clean)}</div>
+          <div style="font-size:12px;color:var(--ink-mute);margin-top:4px;">${matches.length} cover${matches.length===1?'':'s'} on file</div>
+        </div>
+        <button class="modal-close" id="closeCustHist">✕</button>
+      </div>
+      <div style="padding:18px 28px;">
+        ${matches.sort((a,b) => {
+          // Most recent first
+          const ad = a.orderDate?.getTime() || 0;
+          const bd = b.orderDate?.getTime() || 0;
+          return bd - ad;
+        }).map(c => {
+          const idx = allCovers.indexOf(c);
+          return `
+            <div style="padding:12px 14px;margin-bottom:8px;border:1px solid var(--line);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;" data-ch-idx="${idx}" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--line)'">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:200px;">
+                  <div style="font-weight:600;color:var(--ink);">${escapeHtml(c.customer||'—')}</div>
+                  <div style="font-size:11.5px;color:var(--ink-mute);font-family:'JetBrains Mono',monospace;margin-top:3px;">
+                    PO# ${escapeHtml(String(c.poNumber||'—'))} · Order ${fmtDateShort(c.orderDate)} · ${escapeHtml(c.notes||'no notes')}
+                  </div>
+                </div>
+                <span class="status-pill ${statusClass(c.category)}">${c.category}</span>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(10,26,58,.55);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px;';
+  overlay.innerHTML = modalHtml;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.onclick = e => { if(e.target === overlay) close(); };
+  overlay.querySelector('#closeCustHist').onclick = close;
+  overlay.querySelectorAll('[data-ch-idx]').forEach(el => {
+    el.onclick = () => {
+      close();
+      closeDrawer();
+      setTimeout(() => openDrawer(parseInt(el.dataset.chIdx)), 100);
+    };
+  });
+}
+
+/* ==================== BULK SELECTION ==================== */
+function updateBulkBar(){
+  const n = selectedIds.size;
+  const bar = $('#bulkBar');
+  if(n === 0){ bar.classList.remove('show'); return; }
+  bar.classList.add('show');
+  $('#bulkCount').textContent = `${n} selected`;
+}
+
+function clearBulkSelection(){
+  selectedIds.clear();
+  applyFilters();
+  updateBulkBar();
+  const all = $('#bulkSelectAll');
+  if(all) all.checked = false;
+}
+
+function bulkSelectAllVisible(){
+  // Add ids of currently-visible rows
+  view.forEach(o => selectedIds.add(o.id));
+  applyFilters();
+  updateBulkBar();
+}
+
+function getSelectedIndices(){
+  const indices = [];
+  selectedIds.forEach(id => {
+    const idx = allCovers.findIndex(o => o.id === id);
+    if(idx >= 0) indices.push(idx);
+  });
+  return indices;
+}
+
+function bulkAction(actionFn, label){
+  const indices = getSelectedIndices();
+  if(indices.length === 0) return;
+  if(!confirm(`${label} ${indices.length} cover${indices.length===1?'':'s'}?`)) return;
+  // Snapshot for undo
+  const snapshot = indices.map(i => JSON.parse(JSON.stringify(allCovers[i])));
+  const ids = indices.map(i => allCovers[i].id);
+  // Apply action to all selected
+  indices.forEach(i => actionFn(i));
+  // Re-render the whole UI (table, email, banners, KPIs) so the user sees the change immediately
+  render();
+  // Setup undo
+  showUndoToast(`${label} ${indices.length} cover${indices.length===1?'':'s'}`, () => {
+    ids.forEach((id, k) => {
+      const idx = allCovers.findIndex(o => o.id === id);
+      if(idx >= 0) allCovers[idx] = snapshot[k];
+    });
+    changeCount++;
+    saveToStorage();
+    render();
+  });
+  clearBulkSelection();
+}
+
+/* ==================== UNDO SYSTEM ==================== */
+let undoTimer = null;
+function showUndoToast(message, undoFn){
+  const t = $('#toast');
+  t.className = 'toast undo show';
+  t.innerHTML = `<span class="msg">${escapeHtml(message)}</span><button id="undoBtn">Undo</button>`;
+  if(undoTimer) clearTimeout(undoTimer);
+  $('#undoBtn').onclick = () => {
+    undoFn();
+    t.className = 'toast';
+    if(undoTimer) clearTimeout(undoTimer);
+    toast('↻ Undone','success');
+  };
+  undoTimer = setTimeout(() => { t.className = 'toast'; }, 6000);
+}
+
+/* ==================== YESTERDAY RECAP ==================== */
+function showYesterdayRecap(){
+  const today = todayStart();
+  const yesterday = new Date(today.getTime() - 86400000);
+  const yKey = `aspen_recap_shown_${today.toISOString().slice(0,10)}`;
+  if(localStorage.getItem(yKey)) return; // already shown today
+
+  const arrivedYesterday = allCovers.filter(o => {
+    if(!o.checkedIn) return false;
+    const m = o.checkedIn.match(/(\d{1,2})[\/-](\d{1,2})/);
+    if(!m) return false;
+    return parseInt(m[1],10) === yesterday.getMonth()+1 && parseInt(m[2],10) === yesterday.getDate();
+  }).length;
+
+  const deliveredYesterday = allCovers.filter(o => {
+    if(!o.deliveredAt) return false;
+    const d = new Date(o.deliveredAt);
+    return d.getMonth() === yesterday.getMonth() && d.getDate() === yesterday.getDate();
+  }).length;
+
+  const arrivingThisWeek = allCovers.filter(o => {
+    if(o.checkedIn) return false;
+    if(!o.expectedRecDate) return false;
+    return o.expectedRecDate >= today && o.expectedRecDate <= new Date(today.getTime()+7*86400000);
+  }).length;
+
+  // Only show if there's something interesting
+  if(arrivedYesterday === 0 && deliveredYesterday === 0 && arrivingThisWeek === 0) return;
+
+  let text = '<strong>Yesterday:</strong> ';
+  text += arrivedYesterday > 0 ? `${arrivedYesterday} arrival${arrivedYesterday===1?'':'s'}` : 'no arrivals';
+  if(deliveredYesterday > 0) text += `, <strong>${deliveredYesterday}</strong> deliver${deliveredYesterday===1?'y':'ies'}`;
+  text += `. <strong>This week:</strong> ${arrivingThisWeek} cover${arrivingThisWeek===1?'':'s'} expected to arrive.`;
+
+  $('#recapText').innerHTML = text;
+  $('#recapCard').classList.remove('hidden');
+  $('#recapDismiss').onclick = () => {
+    $('#recapCard').classList.add('hidden');
+    localStorage.setItem(yKey, '1');
+  };
+}
+
+/* ==================== GLOBAL QUICK SEARCH ==================== */
+function runGlobalSearch(q){
+  const results = $('#globalSearchResults');
+  q = q.trim().toLowerCase();
+  if(!q || q.length < 2){ results.classList.remove('show'); return; }
+  const matches = allCovers.filter(o => {
+    const hay = [o.customer, o.poNumber, o.notes, o.tracking].map(x=>String(x||'').toLowerCase()).join(' ');
+    return hay.includes(q);
+  }).slice(0, 12);
+  if(matches.length === 0){
+    results.innerHTML = `<div class="gs-result" style="cursor:default;"><span style="color:var(--ink-mute);">No matches</span></div>`;
+  } else {
+    results.innerHTML = matches.map(o => {
+      const idx = allCovers.indexOf(o);
+      const statusPill = `<span class="pill ${statusClass(o.category)}" style="background:var(--bg-elev);">${o.category}</span>`;
+      return `<div class="gs-result" data-idx="${idx}">
+        <div class="name">${escapeHtml(o.customer||'—')} ${statusPill}</div>
+        <div class="meta">PO# ${escapeHtml(String(o.poNumber||'—'))} · ${escapeHtml(o.notes||'')}</div>
+      </div>`;
+    }).join('');
+    results.querySelectorAll('.gs-result[data-idx]').forEach(el => {
+      el.onclick = () => {
+        results.classList.remove('show');
+        $('#globalSearchInput').value = '';
+        openDrawer(parseInt(el.dataset.idx));
+      };
+    });
+  }
+  results.classList.add('show');
+}
+
+/* ==================== PRINT DELIVERY SLIP ==================== */
+function printDeliverySlip(idx){
+  const o = allCovers[idx];
+  if(!o) return;
+  const html = `<!DOCTYPE html><html><head><title>Delivery Slip — ${escapeHtml(o.customer)}</title>
+    <style>
+      @page{margin:1in}
+      body{font-family:Georgia,serif;color:#0A1A3A;max-width:7in;margin:0 auto;padding:0}
+      h1{font-size:22px;border-bottom:2px solid #0A1A3A;padding-bottom:8px;margin:0 0 6px}
+      .sub{font-size:11px;color:#B8924C;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:20px}
+      table{width:100%;border-collapse:collapse;margin:14px 0}
+      th{text-align:left;padding:8px;background:#F4F2EC;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#6B7390;border-bottom:1px solid #E8E4DA}
+      td{padding:10px 8px;font-size:14px;border-bottom:1px solid #F4F2EC}
+      .label{color:#6B7390;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;font-weight:600}
+      .row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #F4F2EC}
+      .row .v{font-weight:600}
+      .sig-box{margin-top:40px;border-top:1px solid #0A1A3A;padding-top:8px}
+      .sig-box .label{font-size:11px;color:#6B7390}
+      .notes-box{margin-top:20px;padding:14px;background:#FAF1DE;border-left:3px solid #B8924C;border-radius:4px;font-size:13px;line-height:1.5}
+    </style></head><body>
+    <h1>Aspen Spas — Delivery Slip</h1>
+    <div class="sub">Service Department · ${fmtDateLong(todayStart())}</div>
+
+    <div class="row"><span class="label">Customer</span><span class="v">${escapeHtml(o.customer||'—')}</span></div>
+    <div class="row"><span class="label">PO #</span><span class="v">${escapeHtml(String(o.poNumber||'—'))}</span></div>
+    <div class="row"><span class="label">Phone</span><span class="v">${escapeHtml(o.customerPhone||'—')}</span></div>
+    <div class="row"><span class="label">Cover</span><span class="v">${escapeHtml([o.model,o.color].filter(Boolean).join(' ')||o.notes||'—')}</span></div>
+    <div class="row"><span class="label">Tracking</span><span class="v">${escapeHtml(o.tracking||'—')}</span></div>
+    <div class="row"><span class="label">Delivery date</span><span class="v">${fmtDate(o.deliveryDate)} ${o.deliveryWindow?'· '+o.deliveryWindow:''}</span></div>
+    <div class="row"><span class="label">Destination</span><span class="v">${escapeHtml(o.deliveryAddress||'—')}</span></div>
+    <div class="row"><span class="label">Assigned tech</span><span class="v">${escapeHtml(o.deliveryTech||'—')}</span></div>
+
+    ${o.deliveryNotes ? `<div class="notes-box"><strong>Delivery notes:</strong><br>${escapeHtml(o.deliveryNotes)}</div>` : ''}
+
+    <div class="sig-box">
+      <div class="label">Customer signature</div>
+    </div>
+    <div class="sig-box">
+      <div class="label">Tech signature · ${escapeHtml(o.deliveryTech||'')}</div>
+    </div>
+
+    </body></html>`;
+  const w = window.open('', '_blank');
+  if(!w){ toast('⚠️ Pop-up blocked — allow pop-ups to print'); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => { w.focus(); w.print(); }, 300);
+}
+
+/* ==================== EXPORT FILTERED VIEW ==================== */
+function exportFilteredXlsx(){
+  if(view.length === 0){ toast('⚠️ Nothing in the current view to export'); return; }
+  const headers = ['Checked in','CUSTOMER','Order Date','PO #','Notes','Est Ship Date','Ship Date','Expected Rec. Date','Tracking #','Received','Called'];
+  const aoa = [
+    ['','','','','','','','','','',''],
+    headers,
+  ];
+  view.forEach(o => {
+    aoa.push([
+      o.checkedIn || '',
+      o.customer || '',
+      o.orderDate ? new Date(o.orderDate) : '',
+      o.poNumber || '',
+      o.notes || '',
+      o.estShipDate ? new Date(o.estShipDate) : '',
+      o.shipDate ? new Date(o.shipDate) : '',
+      o.expectedRecDate ? new Date(o.expectedRecDate) : '',
+      o.tracking || '',
+      o.received || '',
+      o.called || '',
+    ]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa, {cellDates:true});
+  ws['!cols'] = [{wch:14},{wch:30},{wch:12},{wch:10},{wch:24},{wch:12},{wch:12},{wch:16},{wch:22},{wch:14},{wch:14}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Covers (filtered)');
+  const today = todayStart();
+  const filterTag = primaryFilter==='ACTIVE'?'active':(primaryFilter==='ARCHIVE'?'delivered':(primaryFilter==='STOCK_ONLY'?'stock':'all'));
+  const fileName = `Aspen-Covers-${filterTag}-${today.toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+  toast(`📥 Exported ${view.length} cover${view.length===1?'':'s'} (filtered view)`,'success');
+}
+
+/* Compute "X days waiting" — useful aging info for covers in warehouse */
+function computeAging(o){
+  // Only show aging for covers in warehouse (not delivered/installed)
+  if(o.category === 'DELIVERED' || o.category === 'INSTALLED' || o.category === 'PENDING') return '';
+  if(!o.checkedIn) return '';
+  // Parse date from checkedIn string ("Here 5/11" or "HERE 11/11")
+  const m = o.checkedIn.match(/(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?/);
+  if(!m) return '';
+  const today = todayStart();
+  const month = parseInt(m[1],10), day = parseInt(m[2],10);
+  let year = m[3] ? parseInt(m[3],10) : today.getFullYear();
+  if(year < 100) year += 2000;
+  const arrivedDate = new Date(year, month-1, day);
+  const days = daysBetween(arrivedDate, today);
+  if(days <= 0) return ''; // today, no aging shown
+  if(days === 1) return '<span class="aging-text">1 day waiting</span>';
+  if(days > 14) return `<span class="aging-text warn">${days} days waiting</span>`;
+  return `<span class="aging-text">${days} days waiting</span>`;
+}
+
+function renderTable(){
+  $('#rowCount').textContent = `· ${view.length} of ${allCovers.length}`;
+  const tb = $('#tableBody');
+  if(!view.length){
+    tb.innerHTML = `<tr><td colspan="10" class="empty-table">No covers match the current filter.</td></tr>`;
+    return;
+  }
+  tb.innerHTML = view.map(o => {
+    const idx = allCovers.indexOf(o);
+    let rowCls;
+    if(o.isStock || o.category === 'STOCK') rowCls = 'row-stock';
+    else if(o.category === 'DELIVERED' || o.category === 'INSTALLED') rowCls = 'row-delivered';
+    else if(o.category === 'DROP SHIP')      rowCls = 'row-dropship';
+    else if(o.checkedIn)                     rowCls = 'row-warehouse';
+    else                                     rowCls = 'row-pending';
+    if(o.modified) rowCls += ' row-modified';
+    if(selectedIds.has(o.id)) rowCls += ' row-selected';
+    const isNew = isCheckedInToday(o.checkedIn);
+    const agingHtml = computeAging(o);
+    const isSelected = selectedIds.has(o.id);
+    // Old order indicator: ordered 90+ days ago, still not in terminal state
+    const isOld = isOldOrder(o, 90) && o.category !== 'DELIVERED' && o.category !== 'INSTALLED';
+    const oldBadge = isOld ? `<span class="old-badge" title="Ordered ${orderAgeDays(o)} days ago">📅 OLD</span>` : '';
+    return `
+      <tr class="${rowCls}" data-idx="${idx}" data-id="${o.id}">
+        <td><input type="checkbox" class="check-row bulk-check" ${isSelected?'checked':''} data-idx="${idx}" data-id="${o.id}" onclick="event.stopPropagation()"></td>
+        <td class="customer" data-idx="${idx}">${escapeHtml(o.customer||'—')}${isNew?'<span class="new-badge">NEW</span>':''}${oldBadge}${agingHtml}</td>
+        <td class="mono">${escapeHtml(String(o.poNumber||'—'))}</td>
+        <td class="mono">${fmtDateShort(o.orderDate)}</td>
+        <td>${escapeHtml(o.notes||'—')}</td>
+        <td class="mono">${fmtDateShort(o.estShipDate)}</td>
+        <td class="mono">${fmtDateShort(o.expectedRecDate)}</td>
+        <td class="mono">${escapeHtml(o.tracking||'—')}</td>
+        <td class="mono">${escapeHtml(o.checkedIn||'—')}</td>
+        <td><span class="status-pill ${statusClass(o.category)}">${o.category}</span></td>
+      </tr>
+    `;
+  }).join('');
+  // Bulk-select checkboxes update selection set
+  $$('#tableBody .bulk-check').forEach(cb => cb.addEventListener('change', e => {
+    const id = e.target.dataset.id;
+    if(e.target.checked) selectedIds.add(id);
+    else selectedIds.delete(id);
+    updateBulkBar();
+    // Update row class
+    const tr = e.target.closest('tr');
+    if(tr) tr.classList.toggle('row-selected', e.target.checked);
+  }));
+  // Click on customer name opens drawer
+  $$('#tableBody td.customer').forEach(td => td.addEventListener('click', () => openDrawer(parseInt(td.dataset.idx))));
+}
+
+function openDrawer(idx){
+  const o = allCovers[idx];
+  if(!o) return;
+  window._activeDrawerIdx = idx;
+  $('#drawerCust').textContent = o.customer || '—';
+  $('#drawerSub').textContent = `PO# ${o.poNumber||'—'} · ${o.category}`;
+
+  const isInstalled = o.category === 'INSTALLED';
+  const isDelivered = o.category === 'DELIVERED' || isInstalled;
+  const isOutForDelivery = o.category === 'OUT FOR DELIVERY';
+  const isScheduled = o.category === 'SCHEDULED';
+  const isArrived = !!o.checkedIn;
+
+  // === Status progression stepper ===
+  const steps = [
+    {key:'PENDING',          label:'Pending',    done: isArrived},
+    {key:'ARRIVED',          label:'In whse',    done: isArrived},
+    {key:'SCHEDULED',        label:'Scheduled',  done: isScheduled || isOutForDelivery || isDelivered},
+    {key:'OUT FOR DELIVERY', label:'Out',        done: isOutForDelivery || isDelivered},
+    {key:'DELIVERED',        label:'Delivered',  done: isDelivered},
+    {key:'INSTALLED',        label:'Installed',  done: isInstalled},
+  ];
+  // Find current step
+  let currentIdx = 0;
+  if(isInstalled) currentIdx = 5;
+  else if(o.category === 'DELIVERED') currentIdx = 4;
+  else if(isOutForDelivery) currentIdx = 3;
+  else if(isScheduled) currentIdx = 2;
+  else if(isArrived) currentIdx = 1;
+  const stepperHtml = `
+    <div class="stepper">
+      ${steps.map((s, i) => `
+        <div class="step ${s.done?'done':''} ${i===currentIdx?'current':''}">
+          <div class="step-dot">${i===currentIdx ? '●' : (s.done ? '✓' : (i+1))}</div>
+          ${s.label}
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  // === Action buttons depending on state ===
+  let actionButtons = '';
+  if(isInstalled){
+    actionButtons = `
+      <div style="padding:14px 16px;background:linear-gradient(135deg,#C5E5CF,#B8E5BA);border-radius:var(--radius-md);">
+        <div style="font-weight:600;color:#1F6E48;font-size:14px;margin-bottom:4px;">✓ Install complete</div>
+        <div style="font-size:12px;color:#1F6E48;font-family:'JetBrains Mono',monospace;">Installed ${o.installedAt ? new Date(o.installedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : ''}</div>
+      </div>
+      <button class="btn btn-sm" id="actRollbackInstalled" style="margin-top:8px;">↻ Undo install</button>
+    `;
+  } else if(o.category === 'DELIVERED'){
+    actionButtons = `
+      <div style="padding:14px 16px;background:linear-gradient(135deg,#D7EFDF,#C5E5CF);border-radius:var(--radius-md);margin-bottom:8px;">
+        <div style="font-weight:600;color:#1F6E48;font-size:14px;margin-bottom:4px;">✓ Delivered to customer</div>
+        <div style="font-size:12px;color:#2E8B57;font-family:'JetBrains Mono',monospace;">${escapeHtml(String(o.received||''))}</div>
+      </div>
+      <button class="drawer-arrival-btn mark-arrived" id="actMarkInstalled" style="background:#1F6E48;margin-bottom:6px;">🔧 Mark as INSTALLED (job complete)</button>
+      <button class="btn btn-sm" id="actRollbackDelivered" style="width:100%;">↻ Undo delivery</button>
+    `;
+  } else if(isOutForDelivery){
+    actionButtons = `
+      <div style="padding:14px 16px;background:linear-gradient(135deg,#D5ECFA,#B8DCF0);border-radius:var(--radius-md);margin-bottom:8px;">
+        <div style="font-weight:600;color:#0277BD;font-size:14px;margin-bottom:4px;">🚐 Tech is out for delivery</div>
+        <div style="font-size:12px;color:#0277BD;">${o.deliveryTech ? 'Tech: '+o.deliveryTech : ''}</div>
+      </div>
+      <button class="drawer-arrival-btn mark-arrived" id="actMarkDelivered" style="background:#2E8B57;margin-bottom:6px;">✓ Confirm DELIVERED to customer</button>
+      <button class="btn btn-sm" id="actRollbackOut" style="width:100%;">↻ Back to scheduled</button>
+    `;
+  } else if(isScheduled){
+    actionButtons = `
+      <div style="padding:14px 16px;background:linear-gradient(135deg,#EFDFFF,#E0C5F5);border-radius:var(--radius-md);margin-bottom:8px;">
+        <div style="font-weight:600;color:#8E44AD;font-size:14px;margin-bottom:4px;">📅 Scheduled for delivery</div>
+        <div style="font-size:12px;color:#8E44AD;">${o.deliveryDate ? fmtDate(o.deliveryDate) : ''}${o.deliveryWindow ? ' · '+o.deliveryWindow : ''}</div>
+      </div>
+      <button class="drawer-arrival-btn mark-arrived" id="actMarkOut" style="background:#0277BD;margin-bottom:6px;">🚐 Mark OUT FOR DELIVERY (tech leaving)</button>
+      <button class="btn btn-sm" id="actRollbackSched" style="width:100%;">↻ Cancel schedule</button>
+    `;
+  } else if(isArrived){
+    actionButtons = `
+      <button class="drawer-arrival-btn mark-arrived" id="actSchedule" style="background:#8E44AD;margin-bottom:6px;">📅 Schedule delivery</button>
+      <button class="drawer-arrival-btn mark-arrived" id="actMarkDeliveredQuick" style="background:#2E8B57;margin-bottom:6px;">🚚 Or: mark as DELIVERED directly</button>
+      <button class="btn btn-sm" id="actUnmark" style="width:100%;">↻ Unmark — not arrived yet</button>
+    `;
+  } else {
+    actionButtons = `<button class="drawer-arrival-btn mark-arrived" id="actMarkArrived">✓ Mark as arrived in warehouse today (${todayCheckedInStr()})</button>`;
+  }
+
+  // === Photo gallery ===
+  const photosHtml = `
+    <div class="drawer-section">
+      <h4>📷 Photos <span style="font-weight:400;font-size:10px;color:var(--ink-mute);text-transform:none;letter-spacing:0;">${o.photos && o.photos.length ? o.photos.length+' photo'+(o.photos.length===1?'':'s') : 'proof of condition'}</span></h4>
+      <div class="photo-strip">
+        ${(o.photos||[]).map((p,pi) => `
+          <div class="photo-thumb" style="background-image:url('${p.dataUrl}');" data-photo-idx="${pi}">
+            <button class="x" data-remove-photo="${pi}" title="Remove">×</button>
+          </div>
+        `).join('')}
+        <label class="photo-add">
+          <span class="icon">+</span>
+          <span>Add</span>
+          <input type="file" accept="image/*" capture="environment" style="display:none;" id="photoInput">
+        </label>
+      </div>
+    </div>
+  `;
+
+  // === Signature section (only when DELIVERED or INSTALLED) ===
+  const sigHtml = (isDelivered) ? `
+    <div class="drawer-section">
+      <h4>✍️ Customer signature</h4>
+      ${o.signature
+        ? `<div class="sig-saved"><img src="${o.signature}" alt="signature"><div style="margin-top:8px;font-size:11px;color:var(--ink-mute);">Tap to redo</div></div>`
+        : `<button class="btn" id="actGetSig" style="width:100%;justify-content:center;padding:14px;">✍️ Capture customer signature</button>`
+      }
+    </div>
+  ` : '';
+
+  // === Tech tickets deep link (visible when ARRIVED or DELIVERED) ===
+  // - When ARRIVED (still in warehouse, not yet delivered): "Create delivery SCHEDULE ticket"
+  // - When DELIVERED/INSTALLED: "Open install ticket" (existing behavior)
+  const isReadyToSchedule = o.checkedIn && !o.deliveredAt && !o.installedAt && !o.isStock
+                            && o.category !== 'STOCK' && o.category !== 'PENDING' && !o.snoozedAt
+                            && !/drop.?ship/i.test(o.notes||'');
+  let ticketsHtml = '';
+  if(isDelivered){
+    ticketsHtml = `
+      <div class="drawer-section">
+        <h4>🎫 Service ticket — install</h4>
+        <button class="btn btn-gold" id="actOpenTickets" style="width:100%;justify-content:center;">
+          🎫 Open install ticket in TECH-TICKETS
+        </button>
+        <div style="font-size:11px;color:var(--ink-mute);margin-top:6px;text-align:center;">
+          Opens your service tickets dashboard with this customer, PO, tech, and notes pre-filled.
+        </div>
+      </div>
+    `;
+  } else if(isReadyToSchedule){
+    ticketsHtml = `
+      <div class="drawer-section">
+        <h4>🎫 Service ticket — <span style="font-weight:400;font-size:11px;color:var(--gold);text-transform:none;letter-spacing:0;">pending schedule</span></h4>
+        <p style="font-size:12px;color:var(--ink-mute);margin:6px 0 10px;line-height:1.5;">
+          Cover arrived at warehouse. Send to TECH-TICKETS Service Log as a pending ticket. Alberto coordinates the delivery date with the customer in TECH-TICKETS.
+        </p>
+        <button class="btn btn-gold" id="actScheduleTicket" style="width:100%;justify-content:center;background:var(--gold);color:white;font-weight:600;">
+          🎫 Send to Service Log
+        </button>
+      </div>
+    `;
+  }
+
+  $('#drawerBody').innerHTML = `
+    ${stepperHtml}
+
+    <div class="drawer-section">
+      ${actionButtons}
+    </div>
+
+    <div class="drawer-section">
+      <h4>Status</h4>
+      <div style="margin-bottom:10px;"><span class="status-pill ${statusClass(o.category)}">${o.category}</span>${o.modified?' <span style="font-size:11px;color:var(--gold);margin-left:8px;">● modified</span>':''}</div>
+      <div class="drawer-row"><span class="k">Checked in</span><span class="v mono">${escapeHtml(o.checkedIn||'—')}</span></div>
+      <div class="drawer-row"><span class="k">Delivered / received</span><span class="v mono">${escapeHtml(String(o.received||'—'))}</span></div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Order <span style="font-weight:400;font-size:10px;color:var(--ink-mute);">click any value to edit</span></h4>
+      <div class="drawer-row"><span class="k">Customer</span><input class="edit-field" data-field="customer" value="${escapeHtml(o.customer||'')}"></div>
+      <div class="drawer-row"><span class="k">PO #</span><input class="edit-field" data-field="poNumber" value="${escapeHtml(String(o.poNumber||''))}"></div>
+      <div class="drawer-row"><span class="k">Notes</span><input class="edit-field" data-field="notes" value="${escapeHtml(o.notes||'')}"></div>
+      <div class="drawer-row"><span class="k">Tracking #</span><input class="edit-field" data-field="tracking" value="${escapeHtml(o.tracking||'')}"></div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>📞 Customer contact</h4>
+      <div class="drawer-row">
+        <span class="k">Phone</span>
+        <input class="edit-field" type="tel" data-field="customerPhone" value="${escapeHtml(o.customerPhone||'')}" placeholder="314-555-0101">
+      </div>
+      <div class="drawer-row">
+        <span class="k">Email</span>
+        <input class="edit-field" type="email" data-field="customerEmail" value="${escapeHtml(o.customerEmail||'')}" placeholder="customer@email.com">
+      </div>
+      ${(o.customerPhone || o.customerEmail) ? `
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+          ${o.customerPhone ? `
+            <a href="tel:${escapeHtml(o.customerPhone)}" class="btn btn-sm" style="text-decoration:none;flex:1;justify-content:center;min-width:80px;">📞 Call</a>
+            <a href="sms:${escapeHtml(o.customerPhone)}?body=${encodeURIComponent(buildSmsBody(o))}" class="btn btn-sm" style="text-decoration:none;flex:1;justify-content:center;min-width:80px;">💬 Text</a>
+          ` : ''}
+          ${o.customerEmail ? `
+            <a href="mailto:${escapeHtml(o.customerEmail)}?subject=${encodeURIComponent('Aspen Spas — Cover delivery for '+ (o.customerName||o.customer))}&body=${encodeURIComponent(buildSmsBody(o))}" class="btn btn-sm" style="text-decoration:none;flex:1;justify-content:center;min-width:80px;">✉️ Email</a>
+          ` : ''}
+        </div>
+      ` : ''}
+    </div>
+
+    ${(isArrived || isDelivered) ? `
+    <div class="drawer-section" style="background:${isDelivered?'#F1F8F3':(isScheduled||isOutForDelivery?'#F5EBFC':'#FBF1DA')};margin:0 -28px;padding:20px 28px;">
+      <h4 style="color:${isDelivered?'#1F6E48':(isScheduled||isOutForDelivery?'#8E44AD':'#C99A2E')};">
+        🚚 Delivery details
+      </h4>
+      <div class="drawer-row">
+        <span class="k">Delivery date</span>
+        <input class="edit-field" type="date" data-field="deliveryDateStr" value="${o.deliveryDate ? toISODate(o.deliveryDate) : ''}">
+      </div>
+      <div class="drawer-row">
+        <span class="k">Time window</span>
+        <select class="edit-field" data-field="deliveryWindow">
+          <option value="">— Anytime —</option>
+          <option ${o.deliveryWindow==='8 AM - 10 AM'?'selected':''}>8 AM - 10 AM</option>
+          <option ${o.deliveryWindow==='9 AM - 11 AM'?'selected':''}>9 AM - 11 AM</option>
+          <option ${o.deliveryWindow==='10 AM - 12 PM'?'selected':''}>10 AM - 12 PM</option>
+          <option ${o.deliveryWindow==='12 PM - 2 PM'?'selected':''}>12 PM - 2 PM</option>
+          <option ${o.deliveryWindow==='1 PM - 3 PM'?'selected':''}>1 PM - 3 PM</option>
+          <option ${o.deliveryWindow==='2 PM - 4 PM'?'selected':''}>2 PM - 4 PM</option>
+          <option ${o.deliveryWindow==='3 PM - 5 PM'?'selected':''}>3 PM - 5 PM</option>
+          <option ${o.deliveryWindow==='4 PM - 6 PM'?'selected':''}>4 PM - 6 PM</option>
+        </select>
+      </div>
+      <div class="drawer-row">
+        <span class="k">Destination</span>
+        <input class="edit-field" data-field="deliveryAddress" placeholder="e.g. Building 4 at Goodfellow" value="${escapeHtml(o.deliveryAddress||'')}">
+      </div>
+      <div class="drawer-row">
+        <span class="k">Assigned tech</span>
+        <select class="edit-field" data-field="deliveryTech">
+          <option value="">— Select tech —</option>
+          <option value="Jeremy" ${o.deliveryTech==='Jeremy'?'selected':''}>Jeremy</option>
+          <option value="Robert" ${o.deliveryTech==='Robert'?'selected':''}>Robert</option>
+          <option value="Pedro" ${o.deliveryTech==='Pedro'?'selected':''}>Pedro</option>
+          <option value="Jarred" ${o.deliveryTech==='Jarred'?'selected':''}>Jarred</option>
+          <option value="Fernando" ${o.deliveryTech==='Fernando'?'selected':''}>Fernando</option>
+          <option value="Gabriel" ${o.deliveryTech==='Gabriel'?'selected':''}>Gabriel</option>
+        </select>
+      </div>
+      <div class="drawer-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+        <span class="k" style="text-align:left;">Delivery notes</span>
+        <textarea class="edit-field" data-field="deliveryNotes" placeholder="Customer access, install requirements…" style="text-align:left;min-height:60px;">${escapeHtml(o.deliveryNotes||'')}</textarea>
+      </div>
+    </div>
+    ` : ''}
+
+    ${photosHtml}
+    ${sigHtml}
+    ${ticketsHtml}
+
+    <div class="drawer-section">
+      <h4>🔗 Spa link <span style="font-weight:400;font-size:10px;color:var(--ink-mute);text-transform:none;letter-spacing:0;">cross-link with warehouse system</span></h4>
+      <div class="drawer-row">
+        <span class="k">Spa serial #</span>
+        <input class="edit-field" data-field="spaSerial" placeholder="e.g. SN12345" value="${escapeHtml(o.spaSerial||'')}">
+      </div>
+      <div style="font-size:11px;color:var(--ink-mute);margin-top:6px;font-style:italic;">
+        ${o.spaSerial
+          ? '🔗 Linked. The warehouse system can match this cover to spa ' + escapeHtml(o.spaSerial)
+          : 'Optionally link to the spa serial number to coordinate delivery in pairs.'}
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>📝 Internal notes <span style="font-weight:400;font-size:10px;color:var(--ink-mute);text-transform:none;letter-spacing:0;">team-only, never overwritten by Excel</span></h4>
+      <textarea class="edit-field" data-field="internalNotes" placeholder="Team notes — e.g. &quot;Customer called 5/8 asking about ETA&quot;, &quot;Cover damaged on arrival, replacement requested&quot;…" style="text-align:left;min-height:80px;width:100%;font-family:inherit;">${escapeHtml(o.internalNotes||'')}</textarea>
+    </div>
+
+    <div class="drawer-section">
+      <h4>Logistics</h4>
+      <div class="drawer-row"><span class="k">Order date</span><span class="v mono">${fmtDate(o.orderDate)}</span></div>
+      <div class="drawer-row"><span class="k">Est. ship date</span><span class="v mono">${fmtDate(o.estShipDate)}</span></div>
+      <div class="drawer-row"><span class="k">Expected arrival</span><span class="v mono">${fmtDate(o.expectedRecDate)}</span></div>
+    </div>
+
+    <div class="drawer-section">
+      <h4>👥 Customer
+        <a href="#" id="custHistoryLink" style="font-weight:500;font-size:11px;color:var(--gold);text-transform:none;letter-spacing:0;margin-left:8px;">View all covers for this customer →</a>
+      </h4>
+      <div class="drawer-row"><span class="k">Name</span><span class="v">${escapeHtml((o.customerName || o.customer || '—').split('—')[0].trim())}</span></div>
+    </div>
+
+    ${(o.history && o.history.length) ? `
+    <div class="drawer-section">
+      <h4>📜 History <span style="font-weight:400;font-size:10px;color:var(--ink-mute);text-transform:none;letter-spacing:0;">${o.history.length} event${o.history.length===1?'':'s'}</span></h4>
+      <div style="max-height:200px;overflow-y:auto;font-size:12px;line-height:1.6;">
+        ${o.history.slice().reverse().map(h => `
+          <div style="padding:6px 0;border-bottom:1px solid var(--line-soft);">
+            <span style="font-weight:600;color:var(--ink);">${escapeHtml(h.who||'?')}</span>
+            <span style="color:var(--ink-mute);">·</span>
+            <span style="color:var(--gold);">${formatHistoryAction(h)}</span>
+            <div style="font-size:10.5px;color:var(--ink-mute);font-family:'JetBrains Mono',monospace;margin-top:2px;">${fmtHistoryDate(h.at)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    ` : ''}
+
+    <div class="drawer-actions">
+      <button class="btn btn-sm" id="drawerSave">💾 Save changes</button>
+      <button class="btn btn-sm" id="drawerPrint">🖨️ Print slip</button>
+      ${o.checkedIn && !o.deliveredAt && !o.installedAt
+        ? `<button class="btn btn-sm" id="drawerUnmarkArrived" title="Clear &quot;Checked in&quot; — for accidentally marked covers">↩️ Unmark arrived</button>`
+        : ''
+      }
+      ${o.snoozedAt
+        ? `<button class="btn btn-sm" id="drawerUnsnooze">↻ Unsnooze</button>`
+        : `<button class="btn btn-sm" id="drawerSnooze">💤 Snooze (task done)</button>`
+      }
+      <button class="btn btn-sm btn-danger" id="drawerDelete">🗑️ Remove</button>
+    </div>
+  `;
+
+  // Wire up action buttons
+  const wire = (id, fn) => { const el = document.getElementById(id); if(el) el.onclick = fn; };
+  wire('actMarkArrived',       () => { toggleArrived(idx); openDrawer(idx); });
+  wire('actUnmark',            () => { toggleArrived(idx); openDrawer(idx); });
+  wire('actSchedule',          () => { markScheduled(idx); openDrawer(idx); });
+  wire('actMarkOut',           () => { markOutForDelivery(idx); openDrawer(idx); });
+  wire('actMarkDelivered',     () => { markDelivered(idx); openDrawer(idx); });
+  wire('actMarkDeliveredQuick',() => { markDelivered(idx); openDrawer(idx); });
+  wire('actMarkInstalled',     () => { markInstalled(idx); openDrawer(idx); });
+  wire('actRollbackSched',     () => { rollbackStatus(idx, 'ARRIVED'); openDrawer(idx); });
+  wire('actRollbackOut',       () => { rollbackStatus(idx, 'SCHEDULED'); openDrawer(idx); });
+  wire('actRollbackDelivered', () => { rollbackStatus(idx, 'OUT FOR DELIVERY'); openDrawer(idx); });
+  wire('actRollbackInstalled', () => { rollbackStatus(idx, 'DELIVERED'); openDrawer(idx); });
+  wire('actGetSig',            () => openSignatureModal(idx));
+  wire('actOpenTickets',       () => openInTechTickets(idx, 'install'));
+  wire('actScheduleTicket',    () => openInTechTickets(idx, 'schedule'));
+  wire('drawerPrint',          () => printDeliverySlip(idx));
+  wire('drawerUnmarkArrived',  () => unmarkArrived(idx));
+  wire('drawerSnooze',         () => {
+    const reason = prompt('Snooze reason (optional — e.g. "Customer picked up", "Returned to supplier"):', '');
+    if(reason !== null) snoozeCover(idx, reason);
+  });
+  wire('drawerUnsnooze',       () => unsnoozeCover(idx));
+  wire('custHistoryLink',      (e) => { if(e && e.preventDefault) e.preventDefault(); openCustomerHistory(o.customerName || o.customer); });
+
+  // Photo handlers
+  const photoInput = document.getElementById('photoInput');
+  if(photoInput) photoInput.onchange = (e) => { if(e.target.files[0]) addPhotoToActiveCover(e.target.files[0]); };
+  document.querySelectorAll('.photo-thumb').forEach(t => {
+    t.onclick = (e) => {
+      if(e.target.dataset.removePhoto !== undefined){
+        e.stopPropagation();
+        if(confirm('Remove this photo?')) removePhoto(idx, parseInt(e.target.dataset.removePhoto));
+      } else {
+        const pi = parseInt(t.dataset.photoIdx);
+        openLightbox(o.photos[pi].dataUrl);
+      }
+    };
+  });
+  // Saved signature → tap to redo
+  const sigImg = $('.sig-saved img');
+  if(sigImg) sigImg.parentElement.onclick = () => openSignatureModal(idx);
+
+  $('#drawerSave').addEventListener('click', () => {
+    const patch = {};
+    $$('#drawerBody .edit-field').forEach(inp => {
+      const field = inp.dataset.field;
+      let value = inp.value.trim();
+      if(field === 'deliveryDateStr'){
+        patch.deliveryDate = value ? new Date(value+'T12:00:00') : null;
+      } else {
+        patch[field] = value;
+      }
+    });
+    updateCover(idx, patch);
+    closeDrawer();
+    toast('💾 Changes saved','success');
+  });
+  $('#drawerDelete').addEventListener('click', () => deleteCover(idx));
+
+  $('#drawer').classList.add('open');
+  $('#drawerOverlay').classList.add('open');
+}
+function closeDrawer(){$('#drawer').classList.remove('open');$('#drawerOverlay').classList.remove('open');}
+
+/* ==================== ADD ARRIVAL MODAL (Stock OR Customer) ==================== */
+let currentArrivalMode = 'stock'; // 'stock' | 'customer'
+
+function setArrivalMode(mode){
+  currentArrivalMode = mode;
+  $('#toggleStock').classList.toggle('active', mode==='stock');
+  $('#toggleCustomer').classList.toggle('active', mode==='customer');
+  $('#customerFields').style.display = mode==='customer' ? '' : 'none';
+  $('#dealerFlagGroup').style.display = mode==='customer' ? '' : 'none';
+  // Default quantity for stock = 10, for customer = 1
+  const qtyEl = $('#stockQty');
+  if(qtyEl && !qtyEl._userTouched) qtyEl.value = mode==='customer' ? 1 : 10;
+  // Adjust placeholders / hints
+  $('.modal-subtitle').textContent = mode==='customer'
+    ? 'Customer cover that arrived but was not on the shipment list'
+    : 'Bulk stock for warehouse inventory';
+}
+
+function refreshCustomerSuggestions(){
+  // Combine: (1) customers from Invoice Tracker (shared DB), (2) names from this app's covers
+  const seen = new Set();
+  const names = [];
+  // Source 1: Invoice Tracker shared customers
+  for(const c of sharedCustomers){
+    const n = (c.name || c.customerName || '').trim();
+    if(!n || seen.has(n.toLowerCase())) continue;
+    seen.add(n.toLowerCase());
+    names.push(n);
+  }
+  // Source 2: own covers history (covers that aren't from Invoice)
+  for(const o of allCovers){
+    const n = (o.customerName || o.customer || '').trim();
+    if(!n || /^STOCK\b/i.test(n)) continue;
+    // Strip product suffix if present ("Customer — Model Color ×Qty")
+    const clean = n.split('—')[0].trim();
+    if(clean && !seen.has(clean.toLowerCase())){
+      seen.add(clean.toLowerCase());
+      names.push(clean);
+    }
+  }
+  names.sort();
+  const dl = $('#customerSuggestions');
+  if(dl) dl.innerHTML = names.slice(0,400).map(n => `<option value="${escapeHtml(n)}">`).join('');
+}
+
+function openAddStock(){
+  // Ensure we have a username for the change log
+  getCurrentUser();
+  setArrivalMode('stock');
+  $('#stockModel').value = '';
+  $('#stockColor').value = '';
+  $('#stockQty').value = 10;
+  $('#stockQty')._userTouched = false;
+  $('#stockPO').value = '';
+  $('#stockTracking').value = '';
+  $('#stockNotes').value = '';
+  $('#customerName').value = '';
+  if($('#customerPhone')) $('#customerPhone').value = '';
+  if($('#customerEmail')) $('#customerEmail').value = '';
+  $('#customerDealer').checked = false;
+  $('#customerDropShip').checked = false;
+  $('#dupPoWarning').style.display = 'none';
+  refreshCustomerSuggestions();
+  $('#addStockModal').classList.add('open');
+  setTimeout(()=>$('#stockPO').focus(),100);
+}
+function closeAddStockModal(){$('#addStockModal').classList.remove('open');}
+
+function checkDuplicatePO(po){
+  if(!po) return false;
+  const target = String(po).trim();
+  return allCovers.some(o => String(o.poNumber||'').trim() === target);
+}
+
+function confirmAddStock(){
+  const model = $('#stockModel').value;
+  const color = $('#stockColor').value;
+  const po = $('#stockPO').value.trim();
+  const tracking = $('#stockTracking').value.trim();
+  const notes = $('#stockNotes').value.trim();
+  const qty = parseInt($('#stockQty').value,10) || 1;
+
+  // Duplicate PO check
+  if(po && checkDuplicatePO(po)){
+    if(!confirm(`⚠️ PO# ${po} already exists in the list. Add this as a separate entry anyway?`)) return;
+  }
+
+  if(currentArrivalMode === 'customer'){
+    const customer = $('#customerName').value.trim();
+    if(!customer){ toast('⚠️ Customer name is required'); $('#customerName').focus(); return; }
+    const phone = $('#customerPhone') ? $('#customerPhone').value.trim() : '';
+    const email = $('#customerEmail') ? $('#customerEmail').value.trim() : '';
+    const dealer = $('#customerDealer').checked;
+    const dropShip = $('#customerDropShip').checked;
+    const ok = addCustomerEntry({customer, po, model, color, qty, tracking, notes, dealer, dropShip, phone, email});
+    if(ok) closeAddStockModal();
+  } else {
+    if(!po && !confirm('No PO number entered. Add anyway?')) return;
+    addStockEntry({model, color, qty, po, tracking, notes});
+    closeAddStockModal();
+  }
+}
+
+/* ==================== EXPORT XLSX ==================== */
+function exportXlsx(){
+  const headers = ['Checked in','CUSTOMER','Order Date','PO #','Notes','Est Ship Date','Ship Date','Expected Rec. Date','Tracking #','Received','Called'];
+  const aoa = [
+    ['', '', '', '', '', '', '', '', '', '', ''], // row 1 (banner row)
+    headers,
+  ];
+  allCovers.forEach(o => {
+    aoa.push([
+      o.checkedIn || '',
+      o.customer || '',
+      o.orderDate ? new Date(o.orderDate) : '',
+      o.poNumber || '',
+      o.notes || '',
+      o.estShipDate ? new Date(o.estShipDate) : '',
+      o.shipDate ? new Date(o.shipDate) : '',
+      o.expectedRecDate ? new Date(o.expectedRecDate) : '',
+      o.tracking || '',
+      o.received || '',
+      o.called || '',
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa, {cellDates:true});
+  // Column widths
+  ws['!cols'] = [{wch:14},{wch:30},{wch:12},{wch:10},{wch:24},{wch:12},{wch:12},{wch:16},{wch:22},{wch:14},{wch:14}];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Covers');
+
+  const today = todayStart();
+  const fileName = `Aspen-Covers-Updated-${today.toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+
+  changeCount = 0;
+  saveToStorage();
+  render();
+  toast('📥 Excel exported — upload back to Google Sheets when ready','success');
+}
+
+/* ==================== EMAIL ACTIONS ==================== */
+async function copyAsHtml(){
+  const html = $('#emailPreview').innerHTML;
+  try{
+    if(navigator.clipboard && window.ClipboardItem){
+      const blob = new Blob([html], {type:'text/html'});
+      const blobText = new Blob([$('#emailPreview').innerText], {type:'text/plain'});
+      await navigator.clipboard.write([new ClipboardItem({'text/html': blob, 'text/plain': blobText})]);
+      toast('📋 Copied as HTML — paste into Outlook','success');
+    } else {
+      await navigator.clipboard.writeText($('#emailPreview').innerText);
+      toast('📋 Copied as text');
+    }
+  } catch(err){ console.error(err); toast('Could not copy. Try Download .eml.'); }
+}
+
+function downloadEml(){
+  const today = todayStart();
+  const subject = `Aspen Covers — Daily Activity Report — ${today.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+  const htmlBody = $('#emailPreview').innerHTML;
+  const fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#EEEAE0;">' +
+    '<table cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#EEEAE0;"><tr><td align="center">' +
+    '<table cellpadding="0" cellspacing="0" border="0" style="max-width:640px;width:100%;background:white;">' +
+    '<tr><td>' + htmlBody + '</td></tr></table></td></tr></table></body></html>';
+
+  const eml = [
+    'X-Unsent: 1','MIME-Version: 1.0',
+    `To: ${DAILY_REPORT_TO}`,
+    `Cc: ${DAILY_REPORT_CC}`,
+    `Subject: ${subject}`,
+    'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: 7bit','',
+    fullHtml
+  ].join('\r\n');
+
+  const blob = new Blob([eml], {type: 'message/rfc822'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Aspen-Covers-Report-${today.toISOString().slice(0,10)}.eml`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  toast('💾 .eml downloaded — open it to launch Outlook','success');
+}
+
+function openInOutlook(){
+  const today = todayStart();
+  const subject = encodeURIComponent(`Aspen Covers — Daily Activity Report — ${today.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`);
+  const body = encodeURIComponent($('#emailPreview').innerText);
+  const url = `mailto:${DAILY_REPORT_TO}?cc=${encodeURIComponent(DAILY_REPORT_CC)}&subject=${subject}&body=${body}`;
+
+  // Browsers limit mailto: URLs to ~2000 chars. If the email is longer, auto-fallback
+  // to the .eml download which has NO size limit AND preserves the full HTML format
+  // (mailto: only sends plain text, .eml keeps the beautiful Aspen header, tables, colors)
+  if(url.length > 1900){
+    toast('📨 Email is large — generating .eml file (better quality, no size limit)…','success');
+    setTimeout(() => {
+      downloadEml();
+      setTimeout(() => {
+        alert(
+`💡 Tip: The .eml file was downloaded to your Downloads folder.
+
+To send it:
+  1. Find "Aspen-Covers-Report-${todayStart().toISOString().slice(0,10)}.eml" in Downloads
+  2. Double-click it → opens in Outlook with everything ready
+  3. Click Send
+
+The .eml method is actually better than the Outlook button because:
+  ✓ Preserves the full HTML format (tables, colors, header)
+  ✓ All recipients are pre-filled (To + 9 CCs)
+  ✓ Works with any email size`
+        );
+      }, 700);
+    }, 400);
+    return;
+  }
+  window.location.href = url;
+}
+
+/* ==================== EVENTS ==================== */
+$('#uploadBtn').addEventListener('click', () => $('#fileInput').click());
+$('#reloadBtn').addEventListener('click', () => $('#fileInput').click());
+$('#fileInput').addEventListener('change', e => {if(e.target.files[0]) readWorkbook(e.target.files[0]);});
+
+const dz = $('#emptyState');
+['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {e.preventDefault();dz.classList.add('drag-over');}));
+['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => {e.preventDefault();dz.classList.remove('drag-over');}));
+dz.addEventListener('drop', e => {if(e.dataTransfer.files[0]) readWorkbook(e.dataTransfer.files[0]);});
+document.body.addEventListener('dragover', e => e.preventDefault());
+document.body.addEventListener('drop', e => {
+  e.preventDefault();
+  if(e.dataTransfer.files[0] && e.dataTransfer.files[0].name.match(/\.xlsx?$/)) readWorkbook(e.dataTransfer.files[0]);
+});
+
+$('#searchInput').addEventListener('input', applyFilters);
+$$('thead th[data-sort]').forEach(th => th.addEventListener('click', () => {
+  const k = th.dataset.sort;
+  if(sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = 1; }
+  $$('thead th .sort-ind').forEach(s => s.textContent = '');
+  th.querySelector('.sort-ind').textContent = sortDir === 1 ? '▲' : '▼';
+  applyFilters();
+}));
+$('#closeDrawer').addEventListener('click', closeDrawer);
+$('#drawerOverlay').addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e => {
+  if(e.key==='Escape'){ closeDrawer(); closeAddStockModal(); }
+});
+
+$('#copyHtmlBtn').addEventListener('click', copyAsHtml);
+$('#downloadEmlBtn').addEventListener('click', downloadEml);
+$('#openOutlookBtn').addEventListener('click', openInOutlook);
+
+// Special note input — saves to localStorage and re-renders email
+document.addEventListener('input', e => {
+  if(e.target && e.target.id === 'emailSpecialNote'){
+    localStorage.setItem('aspen_email_note', e.target.value);
+    renderEmail();
+  }
+});
+
+// Signature modal
+$('#closeSig').addEventListener('click', closeSignatureModal);
+$('#sigCancel').addEventListener('click', closeSignatureModal);
+$('#sigClear').addEventListener('click', clearSignature);
+$('#sigSave').addEventListener('click', saveSignature);
+$('#sigModal').addEventListener('click', e => { if(e.target.id==='sigModal') closeSignatureModal(); });
+
+// Lightbox
+$('#closeLightbox').addEventListener('click', closeLightbox);
+$('#lightbox').addEventListener('click', e => { if(e.target.id==='lightbox' || e.target.id==='closeLightbox') closeLightbox(); });
+
+$('#addStockBtn').addEventListener('click', openAddStock);
+$('#weeklyReportBtn').addEventListener('click', emailWeeklyReport);
+$('#cleanExcelBtn').addEventListener('click', exportCleanXlsx);
+$('#deliveredReportBtn').addEventListener('click', showDeliveredReport);
+$('#closeAddStock').addEventListener('click', closeAddStockModal);
+$('#cancelAddStock').addEventListener('click', closeAddStockModal);
+$('#confirmAddStock').addEventListener('click', confirmAddStock);
+$('#addStockModal').addEventListener('click', e => { if(e.target.id==='addStockModal') closeAddStockModal(); });
+$('#toggleStock').addEventListener('click', () => setArrivalMode('stock'));
+$('#toggleCustomer').addEventListener('click', () => setArrivalMode('customer'));
+
+// Live duplicate PO# warning
+document.addEventListener('input', e => {
+  if(e.target && e.target.id === 'stockPO'){
+    const v = e.target.value.trim();
+    const isDup = v && checkDuplicatePO(v);
+    const w = $('#dupPoWarning');
+    if(w) w.style.display = isDup ? 'block' : 'none';
+  }
+  if(e.target && e.target.id === 'stockQty'){
+    e.target._userTouched = true;
+  }
+});
+
+$('#exportXlsxBtn').addEventListener('click', exportXlsx);
+
+/* Bulk action bar wiring */
+$('#bulkClear').addEventListener('click', clearBulkSelection);
+$('#bulkArrived').addEventListener('click', () => {
+  // Check for old orders being marked as arrived TODAY (likely a mistake)
+  const indices = [...selectedIds].map(id => allCovers.findIndex(c => c.id === id)).filter(i => i >= 0);
+  const oldOrders = indices.map(i => allCovers[i]).filter(o => !o.checkedIn && isOldOrder(o, 60));
+  if(oldOrders.length){
+    const names = oldOrders.slice(0,3).map(o => `${(o.customer||'').split('—')[0].trim()} (ordered ${fmtDateShort(o.orderDate)})`).join(', ');
+    const more = oldOrders.length > 3 ? ` and ${oldOrders.length - 3} more` : '';
+    if(!confirm(
+`⚠️ Heads up: ${oldOrders.length} of the selected cover${oldOrders.length===1?' is':'s are'} from old orders (60+ days):
+  ${names}${more}
+
+Are you sure they all arrived TODAY at the warehouse?
+(Click OK to confirm, Cancel to review.)`
+    )) return;
+  }
+  // Track customer covers that became newly arrived → offer Service Log ticket creation
+  const newlyArrived = [];
+  bulkAction(i => {
+    const o = allCovers[i];
+    const wasUnchecked = !o.checkedIn;
+    if(wasUnchecked){
+      o.checkedIn = todayCheckedInStr();
+      o.modified = true;
+      o.category = categorize(o);
+      logChange(o, 'marked_arrived');
+      changeCount++;
+      // Customer covers only (not stock, not drop-ship)
+      if(!o.isStock && !/drop.?ship/i.test(o.notes||'') && o.category !== 'STOCK'){
+        newlyArrived.push(o.id);
+      }
+    }
+    saveToStorage();
+  }, '✓ Mark as arrived');
+
+  // After bulk arrived: offer to push to Service Log (pending schedule)
+  // Alberto will schedule the date with customer directly in TECH-TICKETS
+  if(newlyArrived.length > 0){
+    setTimeout(() => {
+      const N = newlyArrived.length;
+      const msg = N === 1
+        ? `🎫 Send to TECH-TICKETS Service Log?\n\nThis adds 1 pending ticket so Alberto can schedule it with the customer.\n(No date needed — Alberto coordinates the date in TECH-TICKETS.)`
+        : `🎫 Send ${N} covers to TECH-TICKETS Service Log?\n\nThey'll appear as pending tickets for Alberto to schedule with each customer.\n(Opens ${N} tabs — one per cover.)`;
+      if(confirm(msg)){
+        newlyArrived.forEach((id, i) => {
+          const idx = allCovers.findIndex(c => c.id === id);
+          if(idx >= 0) setTimeout(() => openInTechTickets(idx, 'schedule'), i * 350);
+        });
+        toast(`🎫 Sent ${N} ticket${N===1?'':'s'} to Service Log`, 'success');
+      }
+    }, 900);
+  }
+});
+$('#bulkUnmarkArrived').addEventListener('click', () => {
+  if(!confirm('Unmark these covers as arrived (clear "Checked in" field)?\nUseful when they were marked by mistake.')) return;
+  bulkAction(i => {
+    const o = allCovers[i];
+    if(o.checkedIn){
+      o.checkedIn = '';
+      o.modified = true;
+      o.category = categorize(o);
+      logChange(o, 'unmarked_arrived');
+      changeCount++;
+    }
+    saveToStorage();
+  }, '↩️ Unmark arrived');
+});
+$('#bulkSchedule').addEventListener('click', () => bulkAction(i => {
+  const o = allCovers[i];
+  if(!o.checkedIn) o.checkedIn = todayCheckedInStr();
+  if(!o.deliveryDate) o.deliveryDate = new Date(todayStart().getTime() + 86400000);
+  o.scheduledAt = new Date();
+  o.modified = true; o.category = categorize(o); changeCount++;
+  logChange(o, 'scheduled', {date: o.deliveryDate?.toISOString()?.slice(0,10), tech: o.deliveryTech});
+  saveToStorage();
+}, '📅 Schedule for tomorrow'));
+$('#bulkDelivered').addEventListener('click', () => bulkAction(i => {
+  const o = allCovers[i];
+  if(!o.checkedIn) o.checkedIn = todayCheckedInStr();
+  const dateStr = todayCheckedInStr().replace('Here ','');
+  o.received = `YES Delivered ${dateStr}`;
+  o.deliveryDate = todayStart();
+  o.deliveredAt = new Date();
+  o.modified = true; o.category = categorize(o); changeCount++;
+  saveToStorage();
+}, '🚚 Mark as delivered'));
+$('#bulkInstalled').addEventListener('click', () => bulkAction(i => {
+  const o = allCovers[i];
+  if(!o.deliveredAt) o.deliveredAt = new Date();
+  o.installedAt = new Date();
+  const dateStr = todayCheckedInStr().replace('Here ','');
+  o.received = `YES Installed ${dateStr}`;
+  o.modified = true; o.category = categorize(o); changeCount++;
+  saveToStorage();
+}, '🔧 Mark as installed'));
+
+// Select-all checkbox in header
+$('#bulkSelectAll').addEventListener('change', e => {
+  if(e.target.checked) bulkSelectAllVisible();
+  else clearBulkSelection();
+});
+
+// FAB (mobile)
+$('#fabAdd').addEventListener('click', openAddStock);
+
+// Global search
+const gsInput = $('#globalSearchInput');
+const gsResults = $('#globalSearchResults');
+gsInput.addEventListener('input', e => runGlobalSearch(e.target.value));
+gsInput.addEventListener('focus', e => { if(e.target.value.trim().length >= 2) runGlobalSearch(e.target.value); });
+document.addEventListener('click', e => {
+  if(!e.target.closest('#globalSearchWrap')) gsResults.classList.remove('show');
+});
+
+// Recap dismiss
+// (the recap card binds its dismiss inline when shown)
+
+// ════════════════════════════════════════════════════════════
+// FIREBASE — Initialization, auth, and bidirectional sync
+// ════════════════════════════════════════════════════════════
+
+function setConnectionStatus(state, msg){
+  const ind = $('#connStatus');
+  if(!ind) return;
+  ind.className = 'conn-status ' + state;
+  ind.textContent = msg;
+}
+
+async function initFirebase(){
+  setConnectionStatus('connecting', '⏳ Connecting to Firebase…');
+  try {
+    const app = initializeApp(FIREBASE_CONFIG);
+    db = getDatabase(app);
+    const auth = getAuth(app);
+
+    try {
+      await signInAnonymously(auth);
+      console.info('[Auth] Anonymous sign-in OK, UID:', auth.currentUser?.uid);
+    } catch(authErr){
+      console.error('[Auth] Failed:', authErr);
+      setConnectionStatus('error', '⚠ Auth failed — using local mode');
+      useLocalStorage = true;
+      loadFromStorage();
+      render();
+      return;
+    }
+
+    // Subscribe to covers
+    const coversRef = ref(db, COVERS_PATH);
+    onValue(coversRef, (snap) => {
+      if(suppressRemoteSync) return;
+      const data = snap.val() || {};
+      // Reconstruct array, rehydrate dates
+      allCovers = Object.entries(data).map(([id, v]) => rehydrateCover({id, ...v}));
+      firebaseReady = true;
+      setConnectionStatus('connected', '☁️ Connected · ' + allCovers.length + ' covers');
+      // Save snapshot to localStorage as offline cache
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(allCovers.map(serializeCover)));
+        localStorage.setItem(STORAGE_META, JSON.stringify({source:'firebase', loadedAt:new Date().toISOString(), count:allCovers.length}));
+      } catch(e){ console.warn('localStorage cache failed', e); }
+      render();
+    }, (err) => {
+      console.error('[Firebase] covers read error:', err);
+      setConnectionStatus('error', '⚠ Connection error — using local cache');
+      useLocalStorage = true;
+      loadFromStorage();
+      render();
+    });
+
+    // Subscribe to shared customers from Invoice Tracker
+    const custRef = ref(db, CUSTOMERS_PATH);
+    onValue(custRef, (snap) => {
+      const data = snap.val() || {};
+      sharedCustomers = Object.entries(data).map(([id, v]) => ({id, ...v}));
+      // Refresh datalist if Add modal is open
+      refreshCustomerSuggestions();
+    });
+
+  } catch(e){
+    console.error('[Firebase] init error:', e);
+    setConnectionStatus('error', '⚠ Firebase init failed');
+    useLocalStorage = true;
+    loadFromStorage();
+    render();
+  }
+}
+
+/* Convert in-memory cover (with Date objects) → Firebase-safe (ISO strings) */
+function serializeCover(o){
+  const out = {...o};
+  ['orderDate','estShipDate','shipDate','expectedRecDate','deliveryDate'].forEach(k => {
+    if(out[k] instanceof Date) out[k] = out[k].toISOString();
+    else if(out[k] === null || out[k] === undefined) delete out[k];
+  });
+  ['scheduledAt','outForDeliveryAt','deliveredAt','installedAt','snoozedAt'].forEach(k => {
+    if(out[k] instanceof Date) out[k] = out[k].toISOString();
+    else if(!out[k]) delete out[k];
+  });
+  // Firebase doesn't allow undefined values
+  Object.keys(out).forEach(k => { if(out[k] === undefined) delete out[k]; });
+  return out;
+}
+
+/* Convert Firebase snapshot → in-memory cover (rehydrate Dates) */
+function rehydrateCover(o){
+  return {...o,
+    orderDate: o.orderDate ? new Date(o.orderDate) : null,
+    estShipDate: o.estShipDate ? new Date(o.estShipDate) : null,
+    shipDate: o.shipDate ? new Date(o.shipDate) : null,
+    expectedRecDate: o.expectedRecDate ? new Date(o.expectedRecDate) : null,
+    deliveryDate: o.deliveryDate ? new Date(o.deliveryDate) : null,
+    scheduledAt: o.scheduledAt ? new Date(o.scheduledAt) : null,
+    outForDeliveryAt: o.outForDeliveryAt ? new Date(o.outForDeliveryAt) : null,
+    deliveredAt: o.deliveredAt ? new Date(o.deliveredAt) : null,
+    installedAt: o.installedAt ? new Date(o.installedAt) : null,
+    snoozedAt: o.snoozedAt ? new Date(o.snoozedAt) : null,
+    photos: o.photos || [],
+    signature: o.signature || '',
+  };
+}
+
+/* Push the entire current allCovers array to Firebase.
+   Used after Excel upload or bulk operations. */
+async function pushAllToFirebase(){
+  if(!firebaseReady || !db) return false;
+  try {
+    suppressRemoteSync = true;
+    const payload = {};
+    allCovers.forEach(o => { payload[o.id] = serializeCover(o); });
+    await set(ref(db, COVERS_PATH), payload);
+    await set(ref(db, META_PATH), {
+      lastPush: new Date().toISOString(),
+      count: allCovers.length,
+      schemaVersion: 2,
+    });
+    setTimeout(() => { suppressRemoteSync = false; }, 500);
+    return true;
+  } catch(e){
+    console.error('[Firebase] pushAll failed:', e);
+    suppressRemoteSync = false;
+    return false;
+  }
+}
+
+/* Push a single cover to Firebase (or remove it if null) */
+async function syncCoverToFirebase(cover){
+  if(!firebaseReady || !db || useLocalStorage) return;
+  try {
+    suppressRemoteSync = true;
+    if(cover === null) return; // handled by deleteCoverFromFirebase
+    await set(ref(db, `${COVERS_PATH}/${cover.id}`), serializeCover(cover));
+    setTimeout(() => { suppressRemoteSync = false; }, 300);
+  } catch(e){
+    console.error('[Firebase] sync single cover failed:', e);
+    suppressRemoteSync = false;
+  }
+}
+
+async function deleteCoverFromFirebase(coverId){
+  if(!firebaseReady || !db || useLocalStorage) return;
+  try {
+    suppressRemoteSync = true;
+    await remove(ref(db, `${COVERS_PATH}/${coverId}`));
+    setTimeout(() => { suppressRemoteSync = false; }, 300);
+  } catch(e){
+    console.error('[Firebase] delete cover failed:', e);
+    suppressRemoteSync = false;
+  }
+}
+
+/* ==================== DELIVERED REPORT (for Alberto) ==================== */
+function showDeliveredReport(){
+  const completed = allCovers.filter(o =>
+    o.category === 'DELIVERED' || o.category === 'INSTALLED'
+    || (o.received && /^YES\b|DELIVERED|PICK\s*UP/i.test(String(o.received)))
+  );
+
+  if(completed.length === 0){
+    toast('ℹ️ No delivered covers yet');
+    return;
+  }
+
+  // Sort by completion date (most recent first), then by customer
+  completed.sort((a,b) => {
+    const aD = a.installedAt || a.deliveredAt;
+    const bD = b.installedAt || b.deliveredAt;
+    if(!aD && !bD) return String(a.customer||'').localeCompare(String(b.customer||''));
+    if(!aD) return 1;
+    if(!bD) return -1;
+    return new Date(bD).getTime() - new Date(aD).getTime();
+  });
+
+  // Group by date
+  const byDate = {};
+  completed.forEach(o => {
+    let key;
+    if(o.installedAt) key = new Date(o.installedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    else if(o.deliveredAt) key = new Date(o.deliveredAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    else key = 'Older (date not recorded)';
+    if(!byDate[key]) byDate[key] = [];
+    byDate[key].push(o);
+  });
+
+  // Build plain-text version (for copy/paste/SMS)
+  const lines = [];
+  lines.push(`✅ COVERS DELIVERED / PICKED UP`);
+  lines.push(`${completed.length} total · as of ${fmtDateLong(todayStart())}`);
+  lines.push('');
+  for(const date in byDate){
+    lines.push(`📅 ${date} — ${byDate[date].length} cover${byDate[date].length===1?'':'s'}:`);
+    byDate[date].forEach(o => {
+      const customer = String(o.customer || '—').split('—')[0].trim();
+      const po = o.poNumber || '—';
+      const status = o.category === 'INSTALLED' ? 'INSTALLED' : 'delivered';
+      const tech = o.deliveryTech ? ` · ${o.deliveryTech}` : '';
+      const dest = o.deliveryAddress ? ` · ${o.deliveryAddress}` : '';
+      lines.push(`  • ${customer} (PO# ${po}) — ${status}${tech}${dest}`);
+    });
+    lines.push('');
+  }
+  const textVersion = lines.join('\n');
+
+  // Build HTML modal
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(10,26,58,.55);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px;';
+  overlay.innerHTML = `
+    <div style="background:white;border-radius:var(--radius-lg);max-width:760px;width:100%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow-h);">
+      <div style="padding:22px 28px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-family:Fraunces,Georgia,serif;font-size:22px;font-weight:600;">✅ Delivered &amp; Picked Up</div>
+          <div style="font-size:12.5px;color:var(--ink-mute);margin-top:4px;">${completed.length} cover${completed.length===1?'':'s'} completed — grouped by date</div>
+        </div>
+        <button class="modal-close" id="closeDelivered">✕</button>
+      </div>
+      <div style="padding:18px 28px;overflow-y:auto;flex:1;">
+        <pre id="deliveredText" style="font-family:'Inter','SF Pro',system-ui,sans-serif;font-size:13px;line-height:1.75;color:var(--ink);background:#F8F6F0;padding:18px 20px;border-radius:var(--radius-sm);white-space:pre-wrap;word-break:break-word;margin:0;border:1px solid var(--gold-soft);"></pre>
+      </div>
+      <div style="padding:16px 28px 22px;display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);">
+        <button class="btn btn-primary" id="copyDeliveredBtn">📋 Copy as text</button>
+        <button class="btn btn-gold" id="smsAlbertoBtn">💬 Send to Alberto (SMS)</button>
+        <button class="btn" id="emailAlbertoBtn">✉️ Email Alberto</button>
+        <button class="btn" id="closeDelivered2" style="margin-left:auto;">Close</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  // Insert text safely (escape) into pre
+  overlay.querySelector('#deliveredText').textContent = textVersion;
+
+  const close = () => overlay.remove();
+  overlay.onclick = e => { if(e.target === overlay) close(); };
+  overlay.querySelector('#closeDelivered').onclick = close;
+  overlay.querySelector('#closeDelivered2').onclick = close;
+  overlay.querySelector('#copyDeliveredBtn').onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(textVersion);
+      toast('📋 Copied — paste it in Messages, Slack, or email','success');
+    } catch(e){
+      // Fallback for older browsers
+      const ta = document.createElement('textarea');
+      ta.value = textVersion;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      toast('📋 Copied','success');
+    }
+  };
+  overlay.querySelector('#smsAlbertoBtn').onclick = () => {
+    // iOS SMS link with pre-filled body
+    const sms = `sms:&body=${encodeURIComponent(textVersion)}`;
+    window.location.href = sms;
+  };
+  overlay.querySelector('#emailAlbertoBtn').onclick = () => {
+    const subject = `Delivered & Picked Up — ${fmtDateShort(todayStart())}`;
+    const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(textVersion)}`;
+    window.location.href = mailto;
+  };
+}
+function isCompletedCover(o){
+  if(o.category === 'DELIVERED' || o.category === 'INSTALLED') return true;
+  if(o.snoozedAt) return true;
+  const r = String(o.received||'').toUpperCase();
+  if(/^YES\b|DELIVERED|PICK\s*UP/.test(r)) return true;
+  const n = String(o.notes||'').toUpperCase();
+  if(/^DEL\b|DELIVERED/.test(n)) return true;
+  return false;
+}
+
+function exportCleanXlsx(){
+  const completed = allCovers.filter(isCompletedCover);
+  const active = allCovers.filter(o => !isCompletedCover(o));
+
+  if(completed.length === 0){
+    toast('ℹ️ No completed covers to remove — Excel is already clean.');
+    return;
+  }
+
+  const msg =
+`Generate clean Excel?
+
+• ${completed.length} completed row${completed.length===1?'':'s'} will be moved to
+  an "Archive (delivered)" sheet
+  (delivered, picked up, or snoozed)
+• ${active.length} active row${active.length===1?'':'s'} stay in the "Covers" sheet
+
+The original Google Drive file is NOT modified by this download.
+You can attach the new file when replying to Manuela.
+
+Proceed?`;
+
+  if(!confirm(msg)) return;
+
+  const headers = ['Checked in','CUSTOMER','Order Date','PO #','Notes','Est Ship Date','Ship Date','Expected Rec. Date','Tracking #','Received','Called'];
+
+  active.sort((a,b) => {
+    const aR = a.excelRow ?? Infinity;
+    const bR = b.excelRow ?? Infinity;
+    if(aR === Infinity && bR === Infinity) return 0;
+    if(aR === Infinity) return 1;
+    if(bR === Infinity) return -1;
+    return aR - bR;
+  });
+
+  const buildAoa = (rows) => {
+    const aoa = [
+      ['','','','','','','','','','',''],
+      headers,
+    ];
+    rows.forEach(o => {
+      aoa.push([
+        o.checkedIn || '',
+        o.customer || '',
+        o.orderDate ? new Date(o.orderDate) : '',
+        o.poNumber || '',
+        o.notes || '',
+        o.estShipDate ? new Date(o.estShipDate) : '',
+        o.shipDate ? new Date(o.shipDate) : '',
+        o.expectedRecDate ? new Date(o.expectedRecDate) : '',
+        o.tracking || '',
+        o.received || '',
+        o.called || '',
+      ]);
+    });
+    return aoa;
+  };
+
+  const cols = [{wch:14},{wch:30},{wch:12},{wch:10},{wch:24},{wch:12},{wch:12},{wch:16},{wch:22},{wch:18},{wch:14}];
+
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Covers (active only)
+  const wsCovers = XLSX.utils.aoa_to_sheet(buildAoa(active), {cellDates:true});
+  wsCovers['!cols'] = cols;
+  XLSX.utils.book_append_sheet(wb, wsCovers, 'Covers');
+
+  // Sheet 2: Archive (delivered) — for reference
+  const completedSorted = [...completed].sort((a,b) => {
+    const aD = (a.installedAt || a.deliveredAt) ? new Date(a.installedAt || a.deliveredAt).getTime() : 0;
+    const bD = (b.installedAt || b.deliveredAt) ? new Date(b.installedAt || b.deliveredAt).getTime() : 0;
+    return bD - aD;
+  });
+  const wsArchive = XLSX.utils.aoa_to_sheet(buildAoa(completedSorted), {cellDates:true});
+  wsArchive['!cols'] = cols;
+  XLSX.utils.book_append_sheet(wb, wsArchive, 'Archive (delivered)');
+
+  const dateStr = todayStart().toISOString().slice(0,10);
+  const fileName = `Inventory_A_B_Covers_Saunas_CLEAN_${dateStr}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+  toast(`📥 Downloaded · ${active.length} active · ${completed.length} archived`, 'success');
+
+  setTimeout(() => {
+    if(confirm(
+`✓ Downloaded: ${fileName}
+
+• "Covers" sheet — ${active.length} active rows
+• "Archive (delivered)" sheet — ${completed.length} delivered/picked up
+
+Now open the reply email to Manuela so you can attach this file?
+(Manuela's Drive file is not modified — she'll decide whether to replace it.)`
+    )){
+      const userName = localStorage.getItem('aspen_user_name') || 'Nela';
+      const subject = 'Re: cover log';
+      const body =
+`Hi Manuela,
+
+Attached is the cover log with the delivered/picked up rows separated into an "Archive (delivered)" sheet. The "Covers" sheet now only shows the ${active.length} active covers (pending arrival, in warehouse, or in flow).
+
+Feel free to replace the Drive file with this version whenever convenient for you.
+
+Quick note: the service team is moving daily cover tracking to a Firebase-synced dashboard, so going forward this kind of manual cleanup won't be needed — completed covers will auto-archive there. I'll loop you in once it's fully live.
+
+Best,
+${userName}`;
+      const mailto = `mailto:manu@aspenspas.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.location.href = mailto;
+      setTimeout(() => {
+        toast('📎 Don\'t forget to attach the downloaded file!','success');
+      }, 1500);
+    }
+  }, 600);
+}
+
+if(loadFromStorage()) render(); else render();
+
+// Initialize Firebase — runs after local cache is loaded so user sees data immediately,
+// then Firebase data overwrites once it arrives.
+initFirebase();
+// Show yesterday recap after a short delay (only if data is loaded)
+setTimeout(() => { if(allCovers.length) showYesterdayRecap(); }, 600);
+</script>
+</body>
+</html>
