@@ -1168,147 +1168,204 @@ function markScheduled(idx){
 // MESSAGE TEMPLATES SYSTEM
 // ════════════════════════════════════════════════════════════
 const DEFAULT_TEMPLATES = {
-  // ── Customer SMS ─────────────────────────────────────
+  // ════════ Customer SMS ═════════════════════════════════
   customer_sms_arrived: {
     label: '📞 SMS · Cover arrived — pickup',
     audience: 'customer',
     channel: 'sms',
     subject: '',
-    body: `Hi {customer}, this is Aspen Spas. Great news — your {coverType} cover has arrived and is ready for pickup at our warehouse (4609 McRee Ave, St. Louis, MO 63110). Hours: Mon-Fri 8am-5pm. Call (314) 776-5050 with questions. Thank you!`,
+    body: `Hi {firstName}! This is Aspen Spas Service. Great news — your new{coverTypeLabel} spa cover (PO# {po}) has arrived and is ready for pickup at our warehouse: 4609 McRee Ave, St. Louis, MO 63110, Mon–Fri 8am–5pm. If you'd prefer delivery instead, call us at (314) 776-5050. Thanks!`,
   },
   customer_sms_reminder: {
     label: '⏰ SMS · Pickup reminder (3+ days)',
     audience: 'customer',
     channel: 'sms',
     subject: '',
-    body: `Hi {customer}, friendly reminder from Aspen Spas. Your {coverType} cover (PO# {po}) has been ready for pickup for {daysSinceNotified} days. Warehouse: 4609 McRee Ave, St. Louis, MO 63110, Mon-Fri 8am-5pm. Need delivery instead? Call (314) 776-5050. Thank you!`,
+    body: `Hi {firstName}, friendly reminder from Aspen Spas — your{coverTypeLabel} spa cover (PO# {po}) has been ready at our warehouse for {daysSinceNotified} days. Pickup: 4609 McRee Ave, St. Louis, MO 63110, Mon–Fri 8am–5pm. Need delivery? Call (314) 776-5050. Thanks!`,
   },
   customer_sms_delivery_today: {
-    label: '🚚 SMS · Delivery today',
+    label: '🚚 SMS · Delivery on the way today',
     audience: 'customer',
     channel: 'sms',
     subject: '',
-    body: `Hi {customer}, Aspen Spas here. Our technician {tech} is on the way today to deliver and install your {coverType} cover. They'll call before arriving. Thanks!`,
+    body: `Hi {firstName}, Aspen Spas Service here. Our technician {tech} is heading out today to deliver and install your new{coverTypeLabel} spa cover at {address}. They'll call you before arrival. Thanks!`,
   },
-  // ── Customer Email ───────────────────────────────────
+  // ════════ Customer Email ═══════════════════════════════
   customer_email_arrived: {
-    label: '✉️ Email · Cover arrived — pickup',
+    label: '✉️ Email · Cover arrived — pickup or delivery',
     audience: 'customer',
     channel: 'email',
-    subject: `Your Aspen Spas {coverType} cover has arrived — ready for pickup`,
-    body: `Hi {customerFull},
+    subject: `Your Aspen Spas{coverTypeLabel} spa cover has arrived (PO# {po})`,
+    body: `Hi {firstName},
 
-Great news — your {coverType} cover has arrived at our warehouse and is ready for pickup!
+Great news — your new{coverTypeLabel} spa cover has arrived at our warehouse and is ready for you.
 
-📍 Pickup location:
-Aspen Spas
-4609 McRee Avenue
-St. Louis, MO 63110
+ORDER DETAILS
+• PO#: {po}
+• Order date: {orderDate}
+• Arrived: {arrivalDate}
 
-🕐 Hours: Monday–Friday, 8:00 AM – 5:00 PM
+You have two ways to receive it:
 
-📞 Questions? Call us at (314) 776-5050
+OPTION 1 — Pickup at our warehouse (anytime convenient for you)
+   📍 Aspen Spas Service Center
+   4609 McRee Avenue, St. Louis, MO 63110
+   🕐 Monday–Friday, 8:00 AM – 5:00 PM
+   📞 (314) 776-5050 (please call ahead so we have it ready)
 
-If you'd prefer delivery and installation instead of pickup, please let us know and we'll schedule a visit at your convenience.
+OPTION 2 — Delivery & installation (we come to you)
+   Reply to this email or call (314) 776-5050 and we'll schedule a convenient time. Our technician will deliver and install at:
+   {address}
 
-Thank you for choosing Aspen Spas!
+Please let us know which option works best for you so we can finalize the next step.
+
+Thank you for choosing Aspen Spas — we appreciate your business.
 
 Kind regards,
-Service Department
-Aspen Spas`,
+{myName}
+Service Department · Aspen Spas
+4609 McRee Avenue, St. Louis, MO 63110
+(314) 776-5050 · service@aspenspas.com`,
   },
   customer_email_reminder: {
     label: '⏰ Email · Pickup reminder (3+ days)',
     audience: 'customer',
     channel: 'email',
-    subject: `Reminder: your Aspen Spas cover is waiting for pickup`,
-    body: `Hi {customerFull},
+    subject: `Friendly reminder — your{coverTypeLabel} spa cover is ready (PO# {po})`,
+    body: `Hi {firstName},
 
-This is a friendly reminder that your {coverType} cover (PO# {po}) has been ready for pickup at our warehouse for {daysSinceNotified} days.
+Just a friendly reminder from Aspen Spas Service — your new{coverTypeLabel} spa cover (PO# {po}) has been ready at our warehouse for {daysSinceNotified} days now.
 
-📍 Pickup location:
-Aspen Spas — 4609 McRee Avenue, St. Louis, MO 63110
-🕐 Hours: Mon–Fri, 8:00 AM – 5:00 PM
+WAREHOUSE PICKUP
+   📍 4609 McRee Avenue, St. Louis, MO 63110
+   🕐 Monday–Friday, 8:00 AM – 5:00 PM
+   📞 (314) 776-5050
 
-If pickup is not convenient, we'd be happy to schedule delivery and installation. Just reply to this email or call us at (314) 776-5050.
+If pickup isn't convenient, we'd be happy to schedule delivery and installation instead. Just reply to this email or give us a call at (314) 776-5050 and we'll set it up at your convenience — typically within a few days.
 
-Thank you,
-Service Department
-Aspen Spas`,
-  },
-  customer_email_delivery_scheduled: {
-    label: '📅 Email · Delivery scheduled',
-    audience: 'customer',
-    channel: 'email',
-    subject: `Your Aspen Spas delivery is scheduled`,
-    body: `Hi {customerFull},
-
-This confirms your {coverType} cover delivery is scheduled. Our technician will reach out to confirm the time window the day before.
-
-📦 PO#: {po}
-📍 Delivery address: {address}
-
-Thank you for your patience!
+Looking forward to hearing from you.
 
 Kind regards,
-Service Department
-Aspen Spas`,
+{myName}
+Service Department · Aspen Spas
+4609 McRee Avenue, St. Louis, MO 63110
+(314) 776-5050`,
   },
-  // ── Internal (coworker) Email ────────────────────────
+  customer_email_delivery_scheduled: {
+    label: '📅 Email · Delivery scheduled confirmation',
+    audience: 'customer',
+    channel: 'email',
+    subject: `Aspen Spas delivery scheduled — PO# {po}`,
+    body: `Hi {firstName},
+
+This confirms that we've scheduled the delivery and installation of your new{coverTypeLabel} spa cover.
+
+DELIVERY DETAILS
+• PO#: {po}
+• Delivery address: {address}
+• Cover type: {coverType}
+
+Our technician will reach out by phone the day before to confirm a 2-hour arrival window. The visit typically takes 30–45 minutes including installation.
+
+If you need to reschedule or have any special access instructions (gate codes, dogs, etc.), please reply to this email or call (314) 776-5050.
+
+Thank you for choosing Aspen Spas.
+
+Kind regards,
+{myName}
+Service Department · Aspen Spas
+4609 McRee Avenue, St. Louis, MO 63110
+(314) 776-5050`,
+  },
+  // ════════ Internal (coworker) Email ════════════════════
   internal_email_arrived: {
-    label: '👥 Internal · Cover arrived alert',
+    label: '👥 Internal · Cover arrived — customer notified',
     audience: 'internal',
     channel: 'email',
-    subject: `Cover arrived: {customer} (PO# {po})`,
+    subject: `Cover arrived & customer notified — {customerFull} · PO# {po}`,
     body: `Hi team,
 
-Quick FYI — the {coverType} cover for {customerFull} (PO# {po}) arrived at the warehouse today.
+Logging this for visibility — a new{coverTypeLabel} spa cover arrived today and I've notified the customer.
 
-• Phone: {phone}
-• Address: {address}
-• Order date: {orderDate}
+═══════════════ CUSTOMER ═══════════════
+Name:        {customerFull}
+Phone:       {phone}
+Email:       {email}
+Address:     {address}
 
-I'll {pickupOrDeliverAction}. Let me know if anything is needed.
+═══════════════ ORDER ══════════════════
+PO#:         {po}
+Cover type:  {coverType}
+Order date:  {orderDate}
+Arrived:     {arrivalDate}
+Tracking:    {tracking}
 
-Thanks,
+═══════════════ STATUS ═════════════════
+✅ SMS sent to customer
+✅ Email sent to customer
+🎯 Next action: {pickupOrDeliverAction}
+
+Let me know if you need any additional info or want to take this one.
+
+Best,
 {myName}`,
   },
   internal_email_pickup_pending: {
-    label: '👥 Internal · Pickup pending alert',
+    label: '👥 Internal · Pickup pending {daysSinceNotified}+ days',
     audience: 'internal',
     channel: 'email',
-    subject: `Pickup pending: {customer} ({daysSinceNotified} days since notification)`,
+    subject: `Pickup pending {daysSinceNotified}d — {customerFull} · PO# {po}`,
     body: `Hi team,
 
-This {coverType} cover has been waiting for pickup for {daysSinceNotified} days since I notified the customer:
+Flagging this one — it's been {daysSinceNotified} days since I notified the customer and the cover is still sitting in the warehouse.
 
-• Customer: {customerFull}
-• PO#: {po}
-• Phone: {phone}
-• Notified on: {notifiedDate}
+═══════════════ CUSTOMER ═══════════════
+Name:        {customerFull}
+Phone:       {phone}
+Email:       {email}
+Address:     {address}
 
-Should we follow up or offer to schedule delivery?
+═══════════════ ORDER ══════════════════
+PO#:         {po}
+Cover type:  {coverType}
+Order date:  {orderDate}
+Arrived:     {arrivalDate}
+Notified:    {notifiedDate}
 
-Thanks,
+═══════════════ RECOMMENDATION ═════════
+Sending a reminder SMS + email today. Should we also offer to schedule a delivery to move it along? Let me know how you'd like me to proceed.
+
+Best,
 {myName}`,
   },
   internal_email_bw_alert: {
-    label: '🌊 Internal · BW cover requires attention',
+    label: '🌊 Internal · Bluewater (BW) cover arrived',
     audience: 'internal',
     channel: 'email',
-    subject: `Bluewater cover arrived — {customer} (PO# {po})`,
+    subject: `🌊 BW cover arrived — {customerFull} · PO# {po}`,
     body: `Hi team,
 
-A Bluewater (BW) cover arrived today — please note this is a special-order cover, not a standard Aspen.
+A Bluewater (BW) cover arrived today. ⚠️ Please note this is a SPECIAL-ORDER cover, not a standard Aspen cover — installation paperwork and tech notes should reflect "BW" so we don't confuse it with a regular Aspen cover.
 
-• Customer: {customerFull}
-• PO#: {po}
-• Phone: {phone}
-• Address: {address}
+═══════════════ CUSTOMER ═══════════════
+Name:        {customerFull}
+Phone:       {phone}
+Email:       {email}
+Address:     {address}
 
-Make sure delivery and install paperwork reflects "BW" for the tech.
+═══════════════ ORDER ══════════════════
+PO#:         {po}
+Cover type:  🌊 Bluewater (BW) — special order
+Order date:  {orderDate}
+Arrived:     {arrivalDate}
+Tracking:    {tracking}
 
-Thanks,
+═══════════════ STATUS ═════════════════
+✅ Customer notified (SMS + email)
+🎯 Next action: {pickupOrDeliverAction}
+⚠️  Tech: confirm BW spec on the cover before install
+
+Best,
 {myName}`,
   },
 };
@@ -1320,8 +1377,8 @@ const DEFAULT_INTERNAL_RECIPIENTS = {
   cc: 'manu@aspenspas.com, peyton@aspenspas.com, dan@aspenspas.com, lana@aspenspas.com, seth@aspenspas.com, neil@aspenspas.com, service@aspenspas.com, tom@aspenspas.com, sam@aspenspas.com',
 };
 
-const TEMPLATES_KEY = 'aspen_templates_v1';
-const TEMPLATES_RECIPIENTS_KEY = 'aspen_templates_recipients_v1';
+const TEMPLATES_KEY = 'aspen_templates_v2';
+const TEMPLATES_RECIPIENTS_KEY = 'aspen_templates_recipients_v2';
 
 function loadTemplates(){
   try {
@@ -1363,13 +1420,33 @@ function saveInternalRecipients(rec){
 }
 
 function coverVars(o){
-  const fullName = (o.customerName || o.customer || '').split('—')[0].trim();
-  const firstName = fullName.split(/[\s,]+/).filter(Boolean)[0] || fullName;
+  // Handle "Lastname, Firstname" format vs "Firstname Lastname"
+  const rawName = (o.customerName || o.customer || '').split('—')[0].trim();
+  let firstName = '', lastName = '', fullName = rawName;
+  if(rawName.includes(',')){
+    // "Powell, Randy" → first = "Randy", last = "Powell"
+    const parts = rawName.split(',').map(p => p.trim()).filter(Boolean);
+    lastName = parts[0] || '';
+    firstName = (parts[1] || '').split(/\s+/).filter(Boolean)[0] || '';
+    // Reformat full name as "Randy Powell" for email greetings
+    fullName = firstName && lastName ? `${firstName} ${lastName}` : rawName;
+  } else {
+    // "Randy Powell" → first = "Randy", last = "Powell"
+    const parts = rawName.split(/\s+/).filter(Boolean);
+    firstName = parts[0] || '';
+    lastName = parts.slice(1).join(' ') || '';
+  }
+  if(!firstName) firstName = rawName;
+
   const checkInDate = o.checkedIn ? parseCheckedIn(o.checkedIn) : null;
   const daysSinceArrival = checkInDate ? Math.max(1, Math.floor((Date.now() - checkInDate.getTime()) / 86400000)) : 0;
   const daysSinceNotified = o.notifiedAt ? Math.max(1, Math.floor((Date.now() - new Date(o.notifiedAt).getTime()) / 86400000)) : 0;
+  const arrivalDateStr = checkInDate ? checkInDate.toLocaleDateString('en-US', {month:'long', day:'numeric'}) : (o.checkedIn || 'today');
+  const coverTypeLabel = o.isBW ? ' Bluewater (BW)' : '';
   return {
     '{customer}': firstName,
+    '{firstName}': firstName,
+    '{lastName}': lastName,
     '{customerFull}': fullName,
     '{po}': o.poNumber || 'N/A',
     '{date}': new Date().toLocaleDateString('en-US'),
@@ -1377,12 +1454,17 @@ function coverVars(o){
     '{phone}': o.customerPhone || '[phone not on file]',
     '{email}': o.customerEmail || '[email not on file]',
     '{coverType}': o.isBW ? 'Bluewater (BW)' : 'spa',
+    '{coverTypeLabel}': coverTypeLabel,
+    '{tracking}': o.tracking || 'not on file',
+    '{spaSerial}': o.spaSerial || '—',
     '{orderDate}': fmtDate(o.orderDate) || '?',
+    '{arrivalDate}': arrivalDateStr,
     '{daysWaiting}': String(daysSinceArrival),
     '{daysSinceNotified}': String(daysSinceNotified),
     '{notifiedDate}': o.notifiedAt ? new Date(o.notifiedAt).toLocaleDateString('en-US') : '—',
-    '{pickupOrDeliverAction}': o.isPickup ? 'wait for customer to pick up' : 'coordinate delivery with them',
-    '{myName}': localStorage.getItem('aspen_user_name') || 'Service',
+    '{pickupOrDeliverAction}': o.isPickup ? 'wait for customer to pick up at the warehouse' : 'coordinate delivery with the customer',
+    '{pickupOrDelivery}': o.isPickup ? 'pickup' : 'delivery',
+    '{myName}': localStorage.getItem('aspen_user_name') || 'Nela',
     '{tech}': o.deliveryTech || 'our technician',
   };
 }
@@ -1475,6 +1557,17 @@ function openTemplatesModal(){
     if(tab === 'internal'){
       html += `
         <div style="background:#F5F1E8;border:1px solid #E5D9C0;border-radius:10px;padding:14px;margin-bottom:18px;">
+          <strong style="font-size:13px;display:block;margin-bottom:8px;">👤 Your identity (appears as {myName} in templates)</strong>
+          <div style="margin-bottom:10px;">
+            <label style="font-size:11px;color:var(--ink-mute);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">YOUR NAME</label>
+            <input type="text" class="edit-field" id="userName" value="${escapeHtml(localStorage.getItem('aspen_user_name') || 'Nela')}" placeholder="Nela" style="width:100%;margin-top:4px;font-size:13px;">
+            <div style="font-size:10px;color:var(--ink-mute);margin-top:3px;line-height:1.4;">
+              This is how you sign your messages. Will replace <code>{myName}</code> in templates.
+            </div>
+          </div>
+        </div>
+
+        <div style="background:#F5F1E8;border:1px solid #E5D9C0;border-radius:10px;padding:14px;margin-bottom:18px;">
           <strong style="font-size:13px;display:block;margin-bottom:8px;">👥 Internal recipients</strong>
           <div style="margin-bottom:10px;">
             <label style="font-size:11px;color:var(--ink-mute);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">FROM (your account)</label>
@@ -1491,7 +1584,7 @@ function openTemplatesModal(){
             <label style="font-size:11px;color:var(--ink-mute);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">CC (comma-separated)</label>
             <textarea class="edit-field" id="recCc" rows="2" style="width:100%;margin-top:4px;font-size:12px;font-family:'JetBrains Mono',monospace;line-height:1.5;">${escapeHtml(recipients.cc)}</textarea>
           </div>
-          <button class="btn" id="recSave" style="margin-top:8px;background:var(--gold);color:#FFF;border-color:var(--gold);font-weight:600;font-size:12px;">💾 Save recipients</button>
+          <button class="btn" id="recSave" style="margin-top:8px;background:var(--gold);color:#FFF;border-color:var(--gold);font-weight:600;font-size:12px;">💾 Save all settings</button>
         </div>
       `;
     }
@@ -1563,16 +1656,20 @@ function openTemplatesModal(){
       };
     });
 
-    // Recipients save
+    // Recipients save (and user name)
     const recSave = document.getElementById('recSave');
     if(recSave){
       recSave.onclick = () => {
+        const userNameField = document.getElementById('userName');
+        if(userNameField && userNameField.value.trim()){
+          localStorage.setItem('aspen_user_name', userNameField.value.trim());
+        }
         saveInternalRecipients({
           from: document.getElementById('recFrom').value.trim(),
           to: document.getElementById('recTo').value.trim(),
           cc: document.getElementById('recCc').value.trim(),
         });
-        toast('💾 Recipients saved', 'success');
+        toast('💾 Saved your settings', 'success');
       };
     }
   }
