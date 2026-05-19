@@ -1246,76 +1246,97 @@ Just let us know what works. We're here to help!
     label: '✉️ Email · Cover arrived — pickup or delivery',
     audience: 'customer',
     channel: 'email',
-    subject: `Your Aspen Spas{coverTypeLabel} spa cover has arrived (PO# {po}) — pickup or delivery?`,
+    subject: `Your Aspen Spas{coverTypeLabel} spa cover has arrived — ready for pickup or delivery (PO# {po})`,
     body: `Hi {firstName},
 
 Great news — your new{coverTypeLabel} spa cover has arrived at our warehouse and is ready for you. We want to make sure you receive it the way that works best for your schedule.
 
-═══════════════════════════════════════
-  YOUR TWO OPTIONS
-═══════════════════════════════════════
+═══════════════ YOUR ORDER ═══════════════
+PO#:            {po}
+Cover type:     {coverType}
+Order date:     {orderDate}
+Arrived:        {arrivalDate}
 
-📍 OPTION 1 — Warehouse pickup (most flexible)
+═══════════════ OPTION 1 — PICKUP ════════
+📍 Our warehouse:
    Aspen Spas Service Center
    4609 McRee Avenue
    St. Louis, MO 63110
-   Hours: Monday–Friday, 8:00 AM – 5:00 PM
-   
-   Please call (314) 776-5050 a few minutes ahead so we have it ready for you at the door.
 
-🚚 OPTION 2 — Home delivery & installation
-   We'll deliver and install at:
+🕐 Hours:
+   Monday – Friday
+   8:00 AM – 5:00 PM
+
+📞 Please call (314) 776-5050 a few minutes
+   ahead so we have it ready at the door.
+
+═══════════════ OPTION 2 — DELIVERY ══════
+🚚 We'll deliver and install at:
    {address}
-   
-   Reply to this email or call (314) 776-5050 and we'll schedule a 2-hour arrival window at your convenience — typically within a few business days.
 
-═══════════════════════════════════════
-  ORDER REFERENCE
-═══════════════════════════════════════
-   • PO#: {po}
-   • Order date: {orderDate}
-   • Arrived at warehouse: {arrivalDate}
+   Reply to this email or call (314) 776-5050
+   and we'll schedule a 2-hour arrival window
+   at your convenience — typically within a
+   few business days.
 
-Please let us know which option works best so we can finalize the next step. We'll be standing by and happy to help with any questions.
+═══════════════ NEXT STEP ════════════════
+✅ Just let us know which option works best,
+   so we can finalize the next step.
 
-Thank you for choosing Aspen Spas — we appreciate your business.
+   We'll be standing by and happy to help
+   with any questions.
+
+Thank you for choosing Aspen Spas — we truly appreciate your business.
 
 Warm regards,
 {myName}
 Service Department · Aspen Spas
-4609 McRee Avenue, St. Louis, MO 63110
-📞 (314) 776-5050 · ✉️ service@aspenspas.com`,
+📞 (314) 776-5050
+✉️ service@aspenspas.com
+📍 4609 McRee Avenue, St. Louis, MO 63110`,
   },
   customer_email_reminder: {
     label: '⏰ Email · Friendly pickup reminder (3+ days)',
     audience: 'customer',
     channel: 'email',
-    subject: `Friendly reminder — your{coverTypeLabel} spa cover is ready (PO# {po})`,
+    subject: `Friendly reminder — your Aspen Spas{coverTypeLabel} cover is ready (PO# {po})`,
     body: `Hi {firstName},
 
 Just a friendly check-in from Aspen Spas Service. Your{coverTypeLabel} spa cover (PO# {po}) has been ready at our warehouse for {daysSinceNotified} days now, and we want to make sure you get it as soon as it's convenient for you.
 
-═══════════════════════════════════════
-  HOW WOULD YOU LIKE TO RECEIVE IT?
-═══════════════════════════════════════
+═══════════════ YOUR ORDER ═══════════════
+PO#:            {po}
+Cover type:     {coverType}
+Arrived:        {arrivalDate}
+Days waiting:   {daysSinceNotified}
+
+═══════════════ HOW TO RECEIVE IT ════════
 
 📍 OPTION 1 — Pickup at our warehouse
-   4609 McRee Avenue · St. Louis, MO 63110
-   Monday–Friday, 8:00 AM – 5:00 PM
+   4609 McRee Avenue
+   St. Louis, MO 63110
+   Monday – Friday, 8:00 AM – 5:00 PM
    Please call ahead: (314) 776-5050
 
 🚚 OPTION 2 — We'll deliver to you
-   Reply to this email or call (314) 776-5050. We'll set up a convenient time, typically within a few days. Standard delivery includes installation.
+   Reply to this email or call (314) 776-5050.
+   We'll set up a convenient time, typically
+   within a few business days.
+   Standard delivery includes installation.
 
-If you've already arranged a different time with us, please disregard this reminder.
+═══════════════ ALREADY ARRANGED? ════════
+If you've already scheduled a different time
+with us, please disregard this reminder —
+sorry for the duplicate message.
 
 We're standing by and happy to help. Thank you for your patience!
 
 Warm regards,
 {myName}
 Service Department · Aspen Spas
-📞 (314) 776-5050 · ✉️ service@aspenspas.com
-4609 McRee Avenue, St. Louis, MO 63110`,
+📞 (314) 776-5050
+✉️ service@aspenspas.com
+📍 4609 McRee Avenue, St. Louis, MO 63110`,
   },
   customer_email_delivery_scheduled: {
     label: '📅 Email · Delivery confirmation',
@@ -1326,29 +1347,35 @@ Service Department · Aspen Spas
 
 This confirms we've scheduled the delivery and installation of your new{coverTypeLabel} spa cover.
 
-═══════════════════════════════════════
-  DELIVERY DETAILS
-═══════════════════════════════════════
-   PO#:         {po}
-   Address:     {address}
-   Cover type:  {coverType}
-   
-   Our technician will call you the day before to confirm a 2-hour arrival window. The visit typically takes 30–45 minutes including installation.
+═══════════════ DELIVERY DETAILS ═════════
+PO#:            {po}
+Address:        {address}
+Cover type:     {coverType}
 
-═══════════════════════════════════════
-  BEFORE WE ARRIVE
-═══════════════════════════════════════
-If you have any special access instructions (gate codes, dogs, parking, etc.), please reply to this email or call us at (314) 776-5050 so our team is prepared.
+═══════════════ WHAT TO EXPECT ═══════════
+🚚 Our technician will call you the day
+   before to confirm a 2-hour arrival window.
 
-If you need to reschedule, just let us know. We'll do our best to accommodate.
+⏱  The visit typically takes 30–45 minutes
+   including installation.
+
+═══════════════ BEFORE WE ARRIVE ═════════
+If you have any special access instructions
+(gate codes, dogs, parking spots, etc.),
+please reply to this email or call us at
+(314) 776-5050 so our team is prepared.
+
+If you need to reschedule, just let us know
+— we'll do our best to accommodate.
 
 Thank you for choosing Aspen Spas — we're looking forward to taking care of you.
 
 Warm regards,
 {myName}
 Service Department · Aspen Spas
-📞 (314) 776-5050 · ✉️ service@aspenspas.com
-4609 McRee Avenue, St. Louis, MO 63110`,
+📞 (314) 776-5050
+✉️ service@aspenspas.com
+📍 4609 McRee Avenue, St. Louis, MO 63110`,
   },
   // ════════ Internal (coworker) Email ════════════════════
   internal_email_arrived: {
@@ -1453,8 +1480,8 @@ const DEFAULT_INTERNAL_RECIPIENTS = {
   cc: 'manu@aspenspas.com, peyton@aspenspas.com, dan@aspenspas.com, lana@aspenspas.com, seth@aspenspas.com, neil@aspenspas.com, service@aspenspas.com, tom@aspenspas.com, sam@aspenspas.com',
 };
 
-const TEMPLATES_KEY = 'aspen_templates_v5';
-const TEMPLATES_RECIPIENTS_KEY = 'aspen_templates_recipients_v5';
+const TEMPLATES_KEY = 'aspen_templates_v6';
+const TEMPLATES_RECIPIENTS_KEY = 'aspen_templates_recipients_v6';
 
 function loadTemplates(){
   try {
@@ -1783,17 +1810,25 @@ function openExternalLink(url) {
 
 // Helper: build & download a .eml file (reliable email composer for any client)
 // User double-clicks the downloaded .eml → opens in Mail.app / Outlook with all fields prefilled
-// X-Unsent:1 tells Mail.app/Outlook to open in COMPOSE mode (not as received message)
+//
+// IMPORTANT: We do NOT include a From: header — that confuses Outlook into treating
+// the file as a "received" message (it adds FW: to subject and a reply quote header).
+// Without From:, Outlook & Mail.app open it as a clean draft from the user's default
+// account, with To/Cc/Subject/Body all prefilled correctly.
+//
+// X-Unsent:1 tells the email client to open in COMPOSE mode (not preview).
 function downloadEmailEml(toEmail, subject, body, ccEmails, fromEmail) {
+  // fromEmail is accepted for API compatibility but intentionally NOT written into headers.
+  // Outlook uses the user's signed-in account automatically; including From: causes bugs.
   const lines = [];
-  if (fromEmail) lines.push(`From: ${fromEmail}`);
+  lines.push(`MIME-Version: 1.0`);
+  lines.push(`X-Unsent: 1`);
   lines.push(`To: ${toEmail}`);
   if (ccEmails) lines.push(`Cc: ${ccEmails}`);
   lines.push(`Subject: ${subject}`);
-  lines.push(`X-Unsent: 1`);
   lines.push(`Content-Type: text/plain; charset=utf-8`);
-  lines.push(`MIME-Version: 1.0`);
-  lines.push(``);
+  lines.push(`Content-Transfer-Encoding: 8bit`);
+  lines.push(``); // blank line separates headers from body — REQUIRED by RFC 5322
   lines.push(body);
 
   const eml = lines.join('\r\n');
@@ -1802,7 +1837,6 @@ function downloadEmailEml(toEmail, subject, body, ccEmails, fromEmail) {
 
   const a = document.createElement('a');
   a.href = url;
-  // Sanitize subject for filename (replace non-safe chars)
   const safeName = (subject || 'email').replace(/[^a-zA-Z0-9 \-_]/g, '').replace(/\s+/g, '-').slice(0, 60);
   a.download = `${safeName || 'email'}.eml`;
   a.style.display = 'none';
@@ -2021,7 +2055,7 @@ function sendNotifications(idx, choices){
     o.notifiedAt = new Date();
     o.notifiedBy = userName;
     o.notifiedVia = channels.join(' + ');
-    logChange(o, 'customer_notified', {channels: channels.join('+'), bw: o.isBW});
+    logChange(o, 'customer_notified', {channels: channels.join('+'), bw: !!o.isBW});
   }
   o.modified = true;
   changeCount++;
