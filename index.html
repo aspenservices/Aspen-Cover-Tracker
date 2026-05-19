@@ -884,6 +884,8 @@ function readWorkbook(file){
           customerResponse: null, // 'pickup' | 'delivery' | null (still waiting)
           responseAt: null,       // when customer responded
           responseBy: '',         // who logged the response
+          // Warehouse physical location (mainly for DEALER covers — track which building)
+          warehouseLocation: '',  // 'Building 1' | 'Building 2' | 'Building 3' | 'Building 4' | ''
           // Snooze (when task is complete or set aside)
           snoozedAt: null,
           // History of changes
@@ -1005,6 +1007,7 @@ async function offerFirebaseMigration(parsedFromExcel){
         customerResponse: fbMatch.customerResponse || null,
         responseAt: fbMatch.responseAt || null,
         responseBy: fbMatch.responseBy || '',
+        warehouseLocation: fbMatch.warehouseLocation || '',
         scheduledAt: fbMatch.scheduledAt || null,
         outForDeliveryAt: fbMatch.outForDeliveryAt || null,
         deliveredAt: fbMatch.deliveredAt || null,
@@ -1878,6 +1881,10 @@ function downloadEmailEml(toEmail, subject, body, ccEmails, fromEmail, htmlBody)
   }, 200);
 }
 
+// Aspen Spas logo (Base64 JPEG, ~13KB) embedded as data URI so it shows in any email client
+// without needing external image hosting. Used in customer + internal email headers.
+const ASPEN_LOGO_DATA_URI = 'data:image/jpeg;base64,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';
+
 // Build a beautifully-styled HTML email for customer notifications.
 // Uses Aspen branding (navy + gold) matching the Daily Activity Report style.
 // templateKey: 'arrived' | 'reminder' | 'delivery_scheduled'
@@ -1965,15 +1972,49 @@ function buildCustomerEmailHtml(o, templateKey, userName, daysSinceNotified) {
       </table>
     </td></tr>`;
 
-  // DELIVERY option block
+  // DELIVERY option block — includes pricing ($75 delivery + optional $75 haul-away)
   const deliveryBlock = `
     <tr><td style="padding:0;">
       <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:${BLUE_BG};border-left:4px solid ${BLUE};">
         <tr><td style="padding:18px 22px;font-size:14px;color:${INK};line-height:1.7;font-family:-apple-system,Helvetica,Arial,sans-serif;">
           <div style="margin-bottom:10px;"><strong style="color:${BLUE};">🚚 We'll deliver and install at</strong></div>
           <div style="font-weight:600;">${escapeHtml(address)}</div>
+
+          <!-- Pricing table — delivery service + optional haul-away -->
+          <div style="margin-top:16px;background:white;border-radius:8px;border:1px solid #BBDEFB;overflow:hidden;">
+            <div style="background:${BLUE};color:#FFFFFF;padding:8px 14px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;">
+              💵 Delivery pricing
+            </div>
+            <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+              <tr>
+                <td style="padding:10px 14px;font-size:13px;color:${INK};border-bottom:1px solid #E3F2FD;">
+                  🚚 <strong>Delivery & installation service</strong>
+                </td>
+                <td style="padding:10px 14px;font-size:14px;color:${BLUE};font-weight:700;text-align:right;border-bottom:1px solid #E3F2FD;white-space:nowrap;">
+                  $75
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:10px 14px;font-size:13px;color:${INK};">
+                  ♻️ <strong>Haul away your old cover</strong> <span style="color:${INK_MUTE};font-weight:400;">(optional)</span>
+                </td>
+                <td style="padding:10px 14px;font-size:14px;color:${BLUE};font-weight:700;text-align:right;white-space:nowrap;">
+                  $75
+                </td>
+              </tr>
+              <tr style="background:#F8FAFF;">
+                <td style="padding:10px 14px;font-size:12px;color:${INK_MUTE};font-style:italic;">
+                  Total if you want both services
+                </td>
+                <td style="padding:10px 14px;font-size:15px;color:${NAVY};font-weight:700;text-align:right;white-space:nowrap;">
+                  $150
+                </td>
+              </tr>
+            </table>
+          </div>
+
           <div style="margin-top:14px;padding:10px 14px;background:white;border-radius:6px;border:1px solid #BBDEFB;">
-            Reply to this email or call <strong>(314) 776-5050</strong> and we'll schedule a 2-hour arrival window at your convenience — typically within a few business days. Standard delivery includes installation.
+            Reply to this email or call <strong>(314) 776-5050</strong> and we'll schedule a 2-hour arrival window at your convenience — typically within a few business days. <strong>Please let us know if you also want the haul-away service.</strong>
           </div>
         </td></tr>
       </table>
@@ -2050,10 +2091,10 @@ function buildCustomerEmailHtml(o, templateKey, userName, daysSinceNotified) {
   <tr><td align="center" style="padding:24px 12px;">
     <table cellpadding="0" cellspacing="0" border="0" style="max-width:640px;width:100%;background:#FFFFFF;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
 
-      <!-- Brand header bar -->
-      <tr><td style="background:${NAVY};padding:22px 28px;">
-        <div style="color:${GOLD};font-family:'Georgia',serif;font-size:24px;font-weight:700;letter-spacing:0.5px;">Aspen Spas</div>
-        <div style="color:#FFFFFF;opacity:0.6;font-size:11px;margin-top:6px;letter-spacing:1.5px;text-transform:uppercase;">Service Department</div>
+      <!-- Brand header bar with Aspen Spas logo -->
+      <tr><td style="background:${NAVY};padding:24px 28px;text-align:center;">
+        <img src="${ASPEN_LOGO_DATA_URI}" alt="Aspen Spas" width="240" height="auto" style="display:block;max-width:240px;width:240px;height:auto;margin:0 auto 8px;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;background:white;border-radius:6px;padding:8px 14px;">
+        <div style="color:#FFFFFF;opacity:0.65;font-size:11px;margin-top:10px;letter-spacing:2px;text-transform:uppercase;font-family:-apple-system,Helvetica,Arial,sans-serif;">Service Department</div>
       </td></tr>
 
       <!-- Body -->
@@ -2142,10 +2183,11 @@ function buildInternalEmailHtml(o, templateKey, userName) {
   <tr><td align="center" style="padding:24px 12px;">
     <table cellpadding="0" cellspacing="0" border="0" style="max-width:640px;width:100%;background:#FFFFFF;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
 
-      <!-- Alert header bar -->
-      <tr><td style="background:${headerColor};padding:18px 28px;">
-        <div style="color:#FFFFFF;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;opacity:0.7;">Internal · Aspen Spas Service</div>
-        <div style="color:${GOLD};font-family:'Georgia',serif;font-size:20px;font-weight:700;letter-spacing:0.5px;margin-top:4px;">${headerBadge}</div>
+      <!-- Alert header bar with logo -->
+      <tr><td style="background:${headerColor};padding:20px 28px;text-align:center;">
+        <img src="${ASPEN_LOGO_DATA_URI}" alt="Aspen Spas" width="180" height="auto" style="display:block;max-width:180px;width:180px;height:auto;margin:0 auto 12px;border:0;outline:none;background:white;border-radius:6px;padding:6px 12px;">
+        <div style="color:#FFFFFF;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;opacity:0.7;margin-bottom:4px;">Internal · Service Department</div>
+        <div style="color:${GOLD};font-family:'Georgia',serif;font-size:20px;font-weight:700;letter-spacing:0.5px;">${headerBadge}</div>
         <div style="color:#FFFFFF;opacity:0.7;font-size:12px;margin-top:6px;">${escapeHtml(customerFull)} · PO# ${escapeHtml(String(po))}</div>
       </td></tr>
 
@@ -2179,6 +2221,7 @@ function buildInternalEmailHtml(o, templateKey, userName) {
           ${row('Order Date', escapeHtml(orderDate))}
           ${row('Arrived', escapeHtml(arrivalDate))}
           ${row('Tracking', escapeHtml(tracking))}
+          ${o.warehouseLocation ? row('🏢 Warehouse', '<span style="background:#E65100;color:white;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:0.5px;">'+escapeHtml(o.warehouseLocation.toUpperCase())+'</span>') : ''}
           ${isPickupPending ? row('Notified', notifiedDate + ' <span style="background:#F57C00;color:white;padding:2px 7px;border-radius:4px;font-size:10px;margin-left:4px;">' + daysSinceNotified + ' DAYS AGO</span>') : ''}
         </table>
       </td></tr>
@@ -4417,6 +4460,8 @@ function renderTable(){
     const daysSinceNotified = o.notifiedAt ? Math.floor((Date.now() - new Date(o.notifiedAt).getTime()) / 86400000) : 0;
     const needsReminder = o.notifiedAt && daysSinceNotified >= 3 && !o.deliveredAt && !o.installedAt && !o.customerResponse && (!o.lastReminderAt || (Date.now() - new Date(o.lastReminderAt).getTime()) > 3*86400000);
     const reminderBadge = needsReminder ? `<span style="display:inline-block;padding:2px 7px;margin-left:6px;font-size:9.5px;font-weight:700;letter-spacing:0.4px;background:#F57C00;color:#FFF;border-radius:4px;vertical-align:middle;animation:pulse 2s infinite;" title="${daysSinceNotified} days since notification — consider sending a reminder">⏰ REMINDER</span>` : '';
+    // Warehouse building location badge (DEALER/STOCK covers tracked)
+    const locationBadge = o.warehouseLocation ? `<span style="display:inline-block;padding:2px 7px;margin-left:6px;font-size:9.5px;font-weight:700;letter-spacing:0.4px;background:#E65100;color:#FFF;border-radius:4px;vertical-align:middle;" title="Physical warehouse location">🏢 ${escapeHtml(o.warehouseLocation.toUpperCase())}</span>` : '';
     // Customer response badge (after they responded to notification)
     const responseBadge = o.customerResponse === 'pickup'
       ? `<span style="display:inline-block;padding:2px 7px;margin-left:6px;font-size:9.5px;font-weight:700;letter-spacing:0.4px;background:#388E3C;color:#FFF;border-radius:4px;vertical-align:middle;" title="Customer confirmed pickup ${fmtHistoryDate(o.responseAt)}">📦 WILL PICKUP</span>`
@@ -4451,7 +4496,7 @@ function renderTable(){
       <tr class="${rowCls}" data-idx="${idx}" data-id="${o.id}">
         <td><input type="checkbox" class="check-row bulk-check" ${isSelected?'checked':''} data-idx="${idx}" data-id="${o.id}" onclick="event.stopPropagation()"></td>
         <td class="customer" data-idx="${idx}">
-          <div class="cust-main">${escapeHtml(o.customer||'—')}${isNew?'<span class="new-badge">NEW</span>':''}${bwBadge}${pickupBadge}${notifiedBadge}${responseBadge}${reminderBadge}${oldBadge}</div>
+          <div class="cust-main">${escapeHtml(o.customer||'—')}${isNew?'<span class="new-badge">NEW</span>':''}${bwBadge}${pickupBadge}${locationBadge}${notifiedBadge}${responseBadge}${reminderBadge}${oldBadge}</div>
           <div class="cust-meta">
             ${o.poNumber ? `<span class="meta-chip"><span class="meta-key">PO#</span> ${escapeHtml(String(o.poNumber))}</span>` : ''}
             ${o.orderDate ? `<span class="meta-chip"><span class="meta-key">Ordered</span> ${fmtDateShort(o.orderDate)}</span>` : ''}
@@ -4768,6 +4813,31 @@ function openDrawer(idx){
           ? '🏪 <strong style="color:#6A4C93;">Pickup marked</strong> — no Service Log ticket needed. Just notify customer when arrived.'
           : 'Mark if customer will pick up at warehouse (no delivery scheduled, no tech needed).'}
       </div>
+
+      ${(/DEALER/i.test(o.notes||'') || o.isStock || o.category === 'STOCK')
+        ? `
+        <!-- ═══ Warehouse building location — for DEALER & STOCK covers ═══ -->
+        <div style="margin-top:14px;padding:14px;background:#FFF8E1;border-radius:10px;border:1px solid #FFE082;">
+          <div style="font-size:12px;font-weight:700;color:#E65100;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+            🏢 Warehouse location
+            ${o.warehouseLocation ? `<span style="background:#E65100;color:white;padding:2px 8px;border-radius:6px;font-size:10px;letter-spacing:0.5px;">${escapeHtml(o.warehouseLocation)}</span>` : '<span style="background:#FFE0B2;color:#E65100;padding:2px 8px;border-radius:6px;font-size:10px;">NOT SET</span>'}
+          </div>
+          <select id="warehouseLocationSelect" class="edit-field" style="width:100%;font-size:13px;background:white;">
+            <option value="" ${!o.warehouseLocation?'selected':''}>— Select building —</option>
+            <option value="Building 1" ${o.warehouseLocation==='Building 1'?'selected':''}>🏢 Building 1</option>
+            <option value="Building 2" ${o.warehouseLocation==='Building 2'?'selected':''}>🏢 Building 2</option>
+            <option value="Building 3" ${o.warehouseLocation==='Building 3'?'selected':''}>🏢 Building 3</option>
+            <option value="Building 4" ${o.warehouseLocation==='Building 4'?'selected':''}>🏢 Building 4</option>
+            <option value="Showroom" ${o.warehouseLocation==='Showroom'?'selected':''}>🏪 Showroom</option>
+            <option value="Outside" ${o.warehouseLocation==='Outside'?'selected':''}>🚚 Outside loading area</option>
+          </select>
+          <div style="font-size:11px;color:#856404;margin-top:6px;line-height:1.4;">
+            ${/DEALER/i.test(o.notes||'')
+              ? '🏷 DEALER cover — track where it\'s stored so dealers can be told the exact location when they ask.'
+              : '📦 Stock cover — track building for inventory location.'}
+          </div>
+        </div>
+      ` : ''}
     </div>
 
     <div class="drawer-section">
@@ -4956,6 +5026,27 @@ function openDrawer(idx){
       saveToStorage();
       openDrawer(idx);
       render();
+    };
+  }
+
+  // 🏢 Warehouse building location selector (DEALER & STOCK covers only)
+  const warehouseLocationSelect = document.getElementById('warehouseLocationSelect');
+  if(warehouseLocationSelect){
+    warehouseLocationSelect.onchange = () => {
+      const oldLocation = o.warehouseLocation || '(unset)';
+      const newLocation = warehouseLocationSelect.value;
+      o.warehouseLocation = newLocation;
+      o.modified = true;
+      logChange(o, 'warehouse_location_set', {from: oldLocation, to: newLocation || '(unset)'});
+      changeCount++;
+      saveToStorage();
+      openDrawer(idx);
+      render();
+      if (newLocation) {
+        toast(`🏢 Location set: ${newLocation}`, 'success');
+      } else {
+        toast('🏢 Location cleared', 'info');
+      }
     };
   }
 
