@@ -1204,25 +1204,42 @@ function markScheduled(idx){
 const DEFAULT_TEMPLATES = {
   // ════════ Customer SMS ═════════════════════════════════
   customer_sms_arrived: {
-    label: '📞 SMS · Cover arrived (1 msg, <160 chars)',
+    label: '📞 SMS · Cover arrived',
     audience: 'customer',
     channel: 'sms',
     subject: '',
-    body: `Hi {firstName}! Your{coverTypeLabel} Aspen spa cover (PO# {po}) is ready. Pickup at 4609 McRee Ave, St Louis (M-F 8-5) or call (314) 776-5050 for delivery. -{myName}`,
+    body: `Hi {firstName}! This is {myName} from Aspen Spas Service. Great news — your new{coverTypeLabel} spa cover (PO# {po}) has arrived at our warehouse and is ready for you.
+
+You have two options:
+
+📍 PICKUP — anytime at 4609 McRee Ave, St. Louis, MO 63110 (Mon–Fri, 8am–5pm). Please call ahead so we have it at the door.
+
+🚚 DELIVERY — call us at (314) 776-5050 to coordinate a convenient time. We'll be glad to help.
+
+Let us know which works best — we'll be standing by.
+
+— Aspen Spas Service`,
   },
   customer_sms_reminder: {
-    label: '⏰ SMS · Reminder (1 msg, <160 chars)',
+    label: '⏰ SMS · Reminder (3+ days)',
     audience: 'customer',
     channel: 'sms',
     subject: '',
-    body: `Hi {firstName}, friendly reminder from Aspen Spas: your cover (PO# {po}) has been ready for {daysSinceNotified} days. Pickup or call (314) 776-5050. -{myName}`,
+    body: `Hi {firstName}, friendly check-in from Aspen Spas Service. Your{coverTypeLabel} spa cover (PO# {po}) has been ready at our warehouse for {daysSinceNotified} days now.
+
+📍 Pickup: 4609 McRee Ave, St. Louis, MO 63110 · Mon–Fri 8am–5pm
+🚚 Or call (314) 776-5050 and we'll arrange delivery — usually within a few days.
+
+Just let us know what works. We're here to help!
+
+— Aspen Spas Service`,
   },
   customer_sms_delivery_today: {
-    label: '🚚 SMS · Delivery on the way (1 msg)',
+    label: '🚚 SMS · Delivery on the way',
     audience: 'customer',
     channel: 'sms',
     subject: '',
-    body: `Hi {firstName}, Aspen Spas tech {tech} is on the way today to deliver your{coverTypeLabel} cover at {address}. Will call before arriving. -{myName}`,
+    body: `Hi {firstName}, this is {myName} from Aspen Spas. Our technician {tech} is heading out today to deliver and install your new{coverTypeLabel} spa cover at {address}. They'll call before arriving. Thanks for your patience!`,
   },
   // ════════ Customer Email ═══════════════════════════════
   customer_email_arrived: {
@@ -1436,8 +1453,8 @@ const DEFAULT_INTERNAL_RECIPIENTS = {
   cc: 'manu@aspenspas.com, peyton@aspenspas.com, dan@aspenspas.com, lana@aspenspas.com, seth@aspenspas.com, neil@aspenspas.com, service@aspenspas.com, tom@aspenspas.com, sam@aspenspas.com',
 };
 
-const TEMPLATES_KEY = 'aspen_templates_v4';
-const TEMPLATES_RECIPIENTS_KEY = 'aspen_templates_recipients_v4';
+const TEMPLATES_KEY = 'aspen_templates_v5';
+const TEMPLATES_RECIPIENTS_KEY = 'aspen_templates_recipients_v5';
 
 function loadTemplates(){
   try {
@@ -1754,8 +1771,7 @@ function parseCheckedIn(str){
 // ════════════════════════════════════════════════════════════
 // NOTIFY CUSTOMER — picker + render template + sms/mailto
 
-// Helper: open sms:/mailto: links via anchor click (passes to OS handler like Mail.app
-// or Messages.app instead of opening a blank Chrome tab)
+// Helper: open sms: links via anchor click (passes to OS handler like Messages.app)
 function openExternalLink(url) {
   const a = document.createElement('a');
   a.href = url;
@@ -1763,6 +1779,39 @@ function openExternalLink(url) {
   document.body.appendChild(a);
   a.click();
   setTimeout(() => document.body.removeChild(a), 100);
+}
+
+// Helper: build & download a .eml file (reliable email composer for any client)
+// User double-clicks the downloaded .eml → opens in Mail.app / Outlook with all fields prefilled
+// X-Unsent:1 tells Mail.app/Outlook to open in COMPOSE mode (not as received message)
+function downloadEmailEml(toEmail, subject, body, ccEmails, fromEmail) {
+  const lines = [];
+  if (fromEmail) lines.push(`From: ${fromEmail}`);
+  lines.push(`To: ${toEmail}`);
+  if (ccEmails) lines.push(`Cc: ${ccEmails}`);
+  lines.push(`Subject: ${subject}`);
+  lines.push(`X-Unsent: 1`);
+  lines.push(`Content-Type: text/plain; charset=utf-8`);
+  lines.push(`MIME-Version: 1.0`);
+  lines.push(``);
+  lines.push(body);
+
+  const eml = lines.join('\r\n');
+  const blob = new Blob([eml], {type: 'message/rfc822'});
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  // Sanitize subject for filename (replace non-safe chars)
+  const safeName = (subject || 'email').replace(/[^a-zA-Z0-9 \-_]/g, '').replace(/\s+/g, '-').slice(0, 60);
+  a.download = `${safeName || 'email'}.eml`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 200);
 }
 // ════════════════════════════════════════════════════════════
 function notifyCustomer(idx, opts){
@@ -1934,7 +1983,7 @@ function sendNotifications(idx, choices){
   const email = (o.customerEmail || '').trim();
   const channels = [];
 
-  // 1. SMS to customer
+  // 1. SMS to customer (sms: link still works fine — opens Messages.app)
   if(choices.sms){
     const tpl = templates[choices.sms];
     const {body} = renderTemplate(tpl, o);
@@ -1943,31 +1992,23 @@ function sendNotifications(idx, choices){
     channels.push('sms');
   }
 
-  // 2. Email to customer (delay if SMS was opened first)
+  // 2. Email to customer — download .eml file (reliable, opens in Mail.app on double-click)
   if(choices.email){
     const tpl = templates[choices.email];
     const {subject, body} = renderTemplate(tpl, o);
     setTimeout(() => {
-      openExternalLink(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+      downloadEmailEml(email, subject, body, '', '');
     }, choices.sms ? 1200 : 0);
     channels.push('email');
   }
 
-  // 3. Internal email to team
+  // 3. Internal email to team — also via .eml file
   if(choices.internal){
     const tpl = templates[choices.internal];
     const {subject, body} = renderTemplate(tpl, o);
     const rec = loadInternalRecipients();
-    const paramObj = {
-      subject,
-      body,
-      cc: rec.cc || '',
-    };
-    // Some email clients (Outlook web, Apple Mail) honor &from= to suggest the sending account
-    if(rec.from) paramObj.from = rec.from;
-    const params = new URLSearchParams(paramObj);
     setTimeout(() => {
-      openExternalLink(`mailto:${rec.to}?${params.toString()}`);
+      downloadEmailEml(rec.to, subject, body, rec.cc || '', rec.from || '');
     }, (choices.sms ? 1200 : 0) + (choices.email ? 800 : 0));
     channels.push('internal');
   }
@@ -1988,7 +2029,14 @@ function sendNotifications(idx, choices){
   render();
 
   setTimeout(() => openDrawer(idx), 100);
-  toast(`📧 ${choices.reminder?'Reminder':'Notification'} sent via ${channels.join(' + ')}`, 'success');
+
+  // Build a helpful confirmation message
+  const emailCount = (choices.email ? 1 : 0) + (choices.internal ? 1 : 0);
+  let msg = `📧 ${choices.reminder?'Reminder':'Notification'} sent via ${channels.join(' + ')}`;
+  if (emailCount > 0) {
+    msg += ` · ${emailCount} .eml file${emailCount>1?'s':''} downloaded — double-click to open in Mail`;
+  }
+  toast(msg, 'success');
 }
 
 function markOutForDelivery(idx){
