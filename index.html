@@ -1824,19 +1824,42 @@ function openExternalLink(url) {
 // account, with To/Cc/Subject/Body all prefilled correctly.
 //
 // X-Unsent:1 tells the email client to open in COMPOSE mode (not preview).
-function downloadEmailEml(toEmail, subject, body, ccEmails, fromEmail) {
-  // fromEmail is accepted for API compatibility but intentionally NOT written into headers.
-  // Outlook uses the user's signed-in account automatically; including From: causes bugs.
+//
+// htmlBody (optional): if provided, sends as HTML email (renders beautifully in Outlook/Mail).
+//                      Otherwise sends as plain text. Plain text is still embedded as fallback.
+function downloadEmailEml(toEmail, subject, body, ccEmails, fromEmail, htmlBody) {
   const lines = [];
   lines.push(`MIME-Version: 1.0`);
   lines.push(`X-Unsent: 1`);
   lines.push(`To: ${toEmail}`);
   if (ccEmails) lines.push(`Cc: ${ccEmails}`);
   lines.push(`Subject: ${subject}`);
-  lines.push(`Content-Type: text/plain; charset=utf-8`);
-  lines.push(`Content-Transfer-Encoding: 8bit`);
-  lines.push(``); // blank line separates headers from body — REQUIRED by RFC 5322
-  lines.push(body);
+
+  if (htmlBody) {
+    // HTML mode: use multipart/alternative so clients can fall back to text if needed
+    const boundary = '----=_AspenBoundary' + Date.now();
+    lines.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+    lines.push(``);
+    lines.push(`--${boundary}`);
+    lines.push(`Content-Type: text/plain; charset=utf-8`);
+    lines.push(`Content-Transfer-Encoding: 8bit`);
+    lines.push(``);
+    lines.push(body);
+    lines.push(``);
+    lines.push(`--${boundary}`);
+    lines.push(`Content-Type: text/html; charset=utf-8`);
+    lines.push(`Content-Transfer-Encoding: 8bit`);
+    lines.push(``);
+    lines.push(htmlBody);
+    lines.push(``);
+    lines.push(`--${boundary}--`);
+  } else {
+    // Plain text only
+    lines.push(`Content-Type: text/plain; charset=utf-8`);
+    lines.push(`Content-Transfer-Encoding: 8bit`);
+    lines.push(``);
+    lines.push(body);
+  }
 
   const eml = lines.join('\r\n');
   const blob = new Blob([eml], {type: 'message/rfc822'});
@@ -1853,6 +1876,355 @@ function downloadEmailEml(toEmail, subject, body, ccEmails, fromEmail) {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, 200);
+}
+
+// Build a beautifully-styled HTML email for customer notifications.
+// Uses Aspen branding (navy + gold) matching the Daily Activity Report style.
+// templateKey: 'arrived' | 'reminder' | 'delivery_scheduled'
+function buildCustomerEmailHtml(o, templateKey, userName, daysSinceNotified) {
+  const customer = (o.customerName || o.customer || '').split('—')[0].trim();
+  const firstName = (() => {
+    const parts = customer.split(',');
+    if (parts.length === 2) return parts[1].trim().split(' ')[0]; // "Lastname, Firstname" → Firstname
+    return customer.split(' ')[0]; // "Firstname Lastname" → Firstname
+  })();
+  const po = o.poNumber || 'N/A';
+  const coverType = o.isBW ? 'Bluewater (BW)' : 'Aspen';
+  const coverTypeLabel = o.isBW ? ' Bluewater (BW)' : '';
+  const address = o.deliveryAddress || '(address on file)';
+  const orderDate = o.orderDate ? new Date(o.orderDate).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'}) : '—';
+  const arrivalDate = o.checkedInAt ? new Date(o.checkedInAt).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'}) : 'Today';
+
+  // Brand colors
+  const NAVY = '#0A1A3A';
+  const GOLD = '#D4AF37';
+  const BEIGE = '#EEEAE0';
+  const CREAM = '#FAF7EE';
+  const INK = '#1F2937';
+  const INK_MUTE = '#6B7280';
+  const GREEN = '#1B5E20';
+  const GREEN_BG = '#F1F8F3';
+  const BLUE = '#0D47A1';
+  const BLUE_BG = '#E3F2FD';
+
+  // Intro paragraph varies by template
+  const intro = templateKey === 'reminder'
+    ? `Just a friendly check-in from Aspen Spas Service. Your${coverTypeLabel} spa cover (PO# ${po}) has been ready at our warehouse for <strong>${daysSinceNotified} days</strong> now, and we want to make sure you get it as soon as it's convenient for you.`
+    : templateKey === 'delivery_scheduled'
+    ? `This confirms we've scheduled the delivery and installation of your new${coverTypeLabel} spa cover.`
+    : `Great news — your new${coverTypeLabel} spa cover has arrived at our warehouse and is ready for you. We want to make sure you receive it the way that works best for your schedule.`;
+
+  // Section header helper
+  const sectionHeader = (icon, title, bgColor) => `
+    <tr><td style="padding:0;">
+      <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin:24px 0 0;">
+        <tr><td style="background:${bgColor || NAVY};color:${GOLD};padding:11px 18px;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;font-family:-apple-system,Helvetica,Arial,sans-serif;">
+          ${icon} ${title}
+        </td></tr>
+      </table>
+    </td></tr>`;
+
+  // Order details table
+  const orderTable = `
+    <tr><td style="padding:0;">
+      <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:${CREAM};border-left:4px solid ${GOLD};">
+        <tr>
+          <td style="padding:10px 18px;font-size:13px;color:${INK_MUTE};width:130px;font-family:-apple-system,Helvetica,Arial,sans-serif;">PO #</td>
+          <td style="padding:10px 18px;font-size:13px;color:${INK};font-weight:600;font-family:-apple-system,Helvetica,Arial,sans-serif;">${escapeHtml(String(po))}</td>
+        </tr>
+        <tr style="background:rgba(255,255,255,0.5);">
+          <td style="padding:10px 18px;font-size:13px;color:${INK_MUTE};font-family:-apple-system,Helvetica,Arial,sans-serif;">Cover type</td>
+          <td style="padding:10px 18px;font-size:13px;color:${INK};font-weight:600;font-family:-apple-system,Helvetica,Arial,sans-serif;">${escapeHtml(coverType)}${o.isBW ? ' <span style="background:'+BLUE+';color:white;padding:2px 7px;border-radius:4px;font-size:10px;margin-left:4px;">SPECIAL ORDER</span>' : ''}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 18px;font-size:13px;color:${INK_MUTE};font-family:-apple-system,Helvetica,Arial,sans-serif;">Order date</td>
+          <td style="padding:10px 18px;font-size:13px;color:${INK};font-weight:600;font-family:-apple-system,Helvetica,Arial,sans-serif;">${escapeHtml(orderDate)}</td>
+        </tr>
+        <tr style="background:rgba(255,255,255,0.5);">
+          <td style="padding:10px 18px;font-size:13px;color:${INK_MUTE};font-family:-apple-system,Helvetica,Arial,sans-serif;">Arrived</td>
+          <td style="padding:10px 18px;font-size:13px;color:${INK};font-weight:600;font-family:-apple-system,Helvetica,Arial,sans-serif;">${escapeHtml(arrivalDate)}${templateKey === 'reminder' ? ' <span style="background:#F57C00;color:white;padding:2px 7px;border-radius:4px;font-size:10px;margin-left:4px;">'+daysSinceNotified+' DAYS WAITING</span>' : ''}</td>
+        </tr>
+      </table>
+    </td></tr>`;
+
+  // PICKUP option block
+  const pickupBlock = `
+    <tr><td style="padding:0;">
+      <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:${GREEN_BG};border-left:4px solid ${GREEN};">
+        <tr><td style="padding:18px 22px;font-size:14px;color:${INK};line-height:1.7;font-family:-apple-system,Helvetica,Arial,sans-serif;">
+          <div style="margin-bottom:10px;"><strong style="color:${GREEN};">📍 Our warehouse</strong></div>
+          <div style="font-weight:600;">Aspen Spas Service Center</div>
+          <div>4609 McRee Avenue</div>
+          <div>St. Louis, MO 63110</div>
+          <div style="margin-top:12px;"><strong style="color:${GREEN};">🕐 Hours</strong></div>
+          <div>Monday – Friday, 8:00 AM – 5:00 PM</div>
+          <div style="margin-top:14px;padding:10px 14px;background:white;border-radius:6px;border:1px solid #C8E6C9;">
+            <strong>📞 Please call (314) 776-5050</strong> a few minutes ahead so we have it ready at the door.
+          </div>
+        </td></tr>
+      </table>
+    </td></tr>`;
+
+  // DELIVERY option block
+  const deliveryBlock = `
+    <tr><td style="padding:0;">
+      <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:${BLUE_BG};border-left:4px solid ${BLUE};">
+        <tr><td style="padding:18px 22px;font-size:14px;color:${INK};line-height:1.7;font-family:-apple-system,Helvetica,Arial,sans-serif;">
+          <div style="margin-bottom:10px;"><strong style="color:${BLUE};">🚚 We'll deliver and install at</strong></div>
+          <div style="font-weight:600;">${escapeHtml(address)}</div>
+          <div style="margin-top:14px;padding:10px 14px;background:white;border-radius:6px;border:1px solid #BBDEFB;">
+            Reply to this email or call <strong>(314) 776-5050</strong> and we'll schedule a 2-hour arrival window at your convenience — typically within a few business days. Standard delivery includes installation.
+          </div>
+        </td></tr>
+      </table>
+    </td></tr>`;
+
+  // Next step block
+  const nextStepBlock = `
+    <tr><td style="padding:0;">
+      <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:${CREAM};border-left:4px solid ${GOLD};">
+        <tr><td style="padding:18px 22px;font-size:14px;color:${INK};line-height:1.7;font-family:-apple-system,Helvetica,Arial,sans-serif;">
+          <strong style="color:${NAVY};">✅ Just let us know which option works best</strong> so we can finalize the next step. We'll be standing by and happy to help with any questions.
+        </td></tr>
+      </table>
+    </td></tr>`;
+
+  // Signature
+  const signature = `
+    <tr><td style="padding:0;">
+      <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin-top:30px;border-top:2px solid ${BEIGE};">
+        <tr><td style="padding:20px 0 0;font-size:13px;color:${INK};line-height:1.7;font-family:-apple-system,Helvetica,Arial,sans-serif;">
+          <div style="margin-bottom:4px;">Warm regards,</div>
+          <div style="font-weight:700;color:${NAVY};font-size:14px;margin-bottom:2px;">${escapeHtml(userName || 'Service Team')}</div>
+          <div style="color:${INK_MUTE};font-size:12px;">Service Department · Aspen Spas</div>
+          <div style="margin-top:10px;font-size:12px;color:${INK_MUTE};">
+            📞 <a href="tel:3147765050" style="color:${INK_MUTE};text-decoration:none;">(314) 776-5050</a><br>
+            ✉️ <a href="mailto:service@aspenspas.com" style="color:${INK_MUTE};text-decoration:none;">service@aspenspas.com</a><br>
+            📍 4609 McRee Avenue, St. Louis, MO 63110
+          </div>
+        </td></tr>
+      </table>
+    </td></tr>`;
+
+  // Body content varies by template
+  let bodyContent = '';
+  if (templateKey === 'delivery_scheduled') {
+    // Delivery confirmation flow
+    bodyContent = `
+      ${sectionHeader('🚚', 'Delivery Details')}
+      ${orderTable}
+      ${sectionHeader('📅', 'What to Expect', GREEN)}
+      <tr><td style="padding:0;">
+        <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:${GREEN_BG};border-left:4px solid ${GREEN};">
+          <tr><td style="padding:18px 22px;font-size:14px;color:${INK};line-height:1.7;">
+            🚚 Our technician will call you the day before to confirm a 2-hour arrival window.<br><br>
+            ⏱ The visit typically takes 30–45 minutes including installation.
+          </td></tr>
+        </table>
+      </td></tr>
+      ${sectionHeader('📋', 'Before We Arrive')}
+      <tr><td style="padding:0;">
+        <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:${CREAM};border-left:4px solid ${GOLD};">
+          <tr><td style="padding:18px 22px;font-size:14px;color:${INK};line-height:1.7;">
+            If you have any special access instructions (gate codes, dogs, parking, etc.), please reply to this email or call us at <strong>(314) 776-5050</strong> so our team is prepared. If you need to reschedule, just let us know — we'll do our best to accommodate.
+          </td></tr>
+        </table>
+      </td></tr>`;
+  } else {
+    // Arrived or Reminder — both show pickup + delivery options
+    bodyContent = `
+      ${sectionHeader('📋', 'Your Order')}
+      ${orderTable}
+      ${sectionHeader('📍', 'Option 1 — Warehouse Pickup', GREEN)}
+      ${pickupBlock}
+      ${sectionHeader('🚚', 'Option 2 — Home Delivery & Installation', BLUE)}
+      ${deliveryBlock}
+      ${sectionHeader('🎯', 'Next Step')}
+      ${nextStepBlock}`;
+  }
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Aspen Spas Service</title></head>
+<body style="margin:0;padding:0;background:${BEIGE};font-family:-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;">
+<table cellpadding="0" cellspacing="0" border="0" style="width:100%;background:${BEIGE};">
+  <tr><td align="center" style="padding:24px 12px;">
+    <table cellpadding="0" cellspacing="0" border="0" style="max-width:640px;width:100%;background:#FFFFFF;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+      <!-- Brand header bar -->
+      <tr><td style="background:${NAVY};padding:22px 28px;">
+        <div style="color:${GOLD};font-family:'Georgia',serif;font-size:24px;font-weight:700;letter-spacing:0.5px;">Aspen Spas</div>
+        <div style="color:#FFFFFF;opacity:0.6;font-size:11px;margin-top:6px;letter-spacing:1.5px;text-transform:uppercase;">Service Department</div>
+      </td></tr>
+
+      <!-- Body -->
+      <tr><td style="padding:28px;">
+        <div style="font-size:16px;color:${INK};margin-bottom:14px;font-family:-apple-system,Helvetica,Arial,sans-serif;">Hi ${escapeHtml(firstName)},</div>
+        <p style="margin:0 0 18px;font-size:14px;line-height:1.7;color:${INK};font-family:-apple-system,Helvetica,Arial,sans-serif;">
+          ${intro}
+        </p>
+
+        <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+          ${bodyContent}
+          ${signature}
+        </table>
+      </td></tr>
+
+      <!-- Footer bar -->
+      <tr><td style="background:${NAVY};padding:14px 28px;text-align:center;">
+        <div style="color:#FFFFFF;opacity:0.5;font-size:10px;letter-spacing:1px;text-transform:uppercase;">
+          Aspen Spas · 4609 McRee Avenue · St. Louis, MO 63110 · (314) 776-5050
+        </div>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+}
+
+// Build internal team email HTML — structured briefing format
+// templateKey: 'arrived' | 'pickup_pending' | 'bw_alert'
+function buildInternalEmailHtml(o, templateKey, userName) {
+  const customer = (o.customerName || o.customer || '').split('—')[0].trim();
+  const customerFull = (() => {
+    const parts = customer.split(',');
+    if (parts.length === 2) return parts[1].trim() + ' ' + parts[0].trim();
+    return customer;
+  })();
+  const po = o.poNumber || 'N/A';
+  const coverType = o.isBW ? 'Bluewater (BW) — SPECIAL ORDER' : 'Standard Aspen';
+  const phone = o.customerPhone || '—';
+  const email = o.customerEmail || '—';
+  const address = o.deliveryAddress || '—';
+  const orderDate = o.orderDate ? new Date(o.orderDate).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'}) : '—';
+  const arrivalDate = o.checkedInAt ? new Date(o.checkedInAt).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'}) : 'Today';
+  const tracking = o.trackingNumber || '—';
+  const daysSinceNotified = o.notifiedAt ? Math.max(1, Math.floor((Date.now() - new Date(o.notifiedAt).getTime()) / 86400000)) : 0;
+  const notifiedDate = o.notifiedAt ? new Date(o.notifiedAt).toLocaleDateString('en-US', {month: 'short', day: 'numeric'}) : '—';
+
+  const NAVY = '#0A1A3A';
+  const GOLD = '#D4AF37';
+  const BEIGE = '#EEEAE0';
+  const CREAM = '#FAF7EE';
+  const INK = '#1F2937';
+  const INK_MUTE = '#6B7280';
+
+  // Header bar color varies by alert type
+  const isBwAlert = templateKey === 'bw_alert';
+  const isPickupPending = templateKey === 'pickup_pending';
+  const headerColor = isBwAlert ? '#0D47A1' : isPickupPending ? '#F57C00' : NAVY;
+  const headerBadge = isBwAlert ? '🌊 BW ALERT'
+                    : isPickupPending ? '⏰ STALE PICKUP'
+                    : '✅ COVER ARRIVED';
+
+  const intro = isBwAlert
+    ? `A <strong>Bluewater (BW)</strong> cover arrived today. ⚠️ This is a <strong>SPECIAL-ORDER</strong> cover, not a standard Aspen — installation paperwork and tech notes must clearly reflect "BW" so we don't confuse it with a regular Aspen cover.`
+    : isPickupPending
+    ? `Flagging this one — it's been <strong>${daysSinceNotified} days</strong> since I notified the customer and the cover is still sitting in the warehouse. Sending a reminder today.`
+    : `A new${o.isBW ? ' BW' : ''} cover arrived today and I've already reached out to the customer (SMS + email). Logging here for visibility in case anyone needs context or wants to take this one.`;
+
+  // Build customer info rows
+  const row = (label, value, isWarn) => `
+    <tr>
+      <td style="padding:8px 18px;font-size:13px;color:${INK_MUTE};width:130px;font-family:-apple-system,Helvetica,Arial,sans-serif;border-bottom:1px solid #E5E7EB;">${label}</td>
+      <td style="padding:8px 18px;font-size:13px;color:${isWarn ? '#C62828' : INK};font-weight:600;font-family:-apple-system,Helvetica,Arial,sans-serif;border-bottom:1px solid #E5E7EB;">${value}</td>
+    </tr>`;
+
+  const sectionHeader = (icon, title, color) => `
+    <tr><td colspan="2" style="background:${color || NAVY};color:${GOLD};padding:10px 18px;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;font-family:-apple-system,Helvetica,Arial,sans-serif;">
+      ${icon} ${title}
+    </td></tr>`;
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:${BEIGE};font-family:-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;">
+<table cellpadding="0" cellspacing="0" border="0" style="width:100%;background:${BEIGE};">
+  <tr><td align="center" style="padding:24px 12px;">
+    <table cellpadding="0" cellspacing="0" border="0" style="max-width:640px;width:100%;background:#FFFFFF;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+      <!-- Alert header bar -->
+      <tr><td style="background:${headerColor};padding:18px 28px;">
+        <div style="color:#FFFFFF;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;opacity:0.7;">Internal · Aspen Spas Service</div>
+        <div style="color:${GOLD};font-family:'Georgia',serif;font-size:20px;font-weight:700;letter-spacing:0.5px;margin-top:4px;">${headerBadge}</div>
+        <div style="color:#FFFFFF;opacity:0.7;font-size:12px;margin-top:6px;">${escapeHtml(customerFull)} · PO# ${escapeHtml(String(po))}</div>
+      </td></tr>
+
+      <!-- Intro -->
+      <tr><td style="padding:24px 28px 16px;">
+        <p style="margin:0;font-size:14px;line-height:1.7;color:${INK};">
+          Hi team,
+        </p>
+        <p style="margin:12px 0 0;font-size:14px;line-height:1.7;color:${INK};">
+          ${intro}
+        </p>
+      </td></tr>
+
+      <!-- CUSTOMER section -->
+      <tr><td style="padding:0 28px 8px;">
+        <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:${CREAM};border-radius:8px;overflow:hidden;border:1px solid #E5D9C0;">
+          ${sectionHeader('👤', 'Customer')}
+          ${row('Name', escapeHtml(customerFull))}
+          ${row('Phone', phone === '—' ? '<span style="color:#C62828;">— no phone on file</span>' : '📞 ' + escapeHtml(phone))}
+          ${row('Email', email === '—' ? '<span style="color:#C62828;">— no email on file</span>' : '✉️ ' + escapeHtml(email))}
+          ${row('Address', escapeHtml(address))}
+        </table>
+      </td></tr>
+
+      <!-- ORDER section -->
+      <tr><td style="padding:8px 28px;">
+        <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:${CREAM};border-radius:8px;overflow:hidden;border:1px solid #E5D9C0;">
+          ${sectionHeader('📦', 'Order')}
+          ${row('PO #', escapeHtml(String(po)))}
+          ${row('Cover Type', escapeHtml(coverType) + (o.isBW ? ' <span style="background:#0D47A1;color:white;padding:2px 7px;border-radius:4px;font-size:10px;margin-left:4px;">SPECIAL</span>' : ''))}
+          ${row('Order Date', escapeHtml(orderDate))}
+          ${row('Arrived', escapeHtml(arrivalDate))}
+          ${row('Tracking', escapeHtml(tracking))}
+          ${isPickupPending ? row('Notified', notifiedDate + ' <span style="background:#F57C00;color:white;padding:2px 7px;border-radius:4px;font-size:10px;margin-left:4px;">' + daysSinceNotified + ' DAYS AGO</span>') : ''}
+        </table>
+      </td></tr>
+
+      <!-- STATUS section -->
+      <tr><td style="padding:8px 28px 24px;">
+        <table cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background:${CREAM};border-radius:8px;overflow:hidden;border:1px solid #E5D9C0;">
+          ${sectionHeader('🎯', 'Status & Next Steps', isBwAlert ? '#0D47A1' : isPickupPending ? '#F57C00' : '#1B5E20')}
+          <tr><td colspan="2" style="padding:14px 18px;font-size:13px;color:${INK};line-height:1.8;font-family:-apple-system,Helvetica,Arial,sans-serif;">
+            ${isBwAlert ? `
+              ✅ Customer notified (SMS + email)<br>
+              🎯 <strong>Next:</strong> awaiting customer response<br>
+              ⚠️ <strong style="color:#C62828;">TECH NOTE: Confirm BW spec on the cover before delivery/install — must match Bluewater paperwork, NOT Aspen standard.</strong>
+            ` : isPickupPending ? `
+              ⏰ Customer notified ${daysSinceNotified} days ago — no response yet<br>
+              📧 Sending a reminder today (SMS + email)<br>
+              🎯 <strong>Next:</strong> awaiting customer response — consider offering delivery if they don't respond in 3 more days
+            ` : `
+              ✅ SMS sent — both pickup and delivery options explained<br>
+              ✅ Email sent — full details, address on file, clear call-to-action<br>
+              🎯 <strong>Next:</strong> awaiting customer response (pickup or scheduled delivery)<br>
+              ⏰ Will send a reminder after 3 days if no contact
+            `}
+          </td></tr>
+        </table>
+      </td></tr>
+
+      <!-- Signature -->
+      <tr><td style="padding:0 28px 24px;">
+        <div style="border-top:2px solid ${BEIGE};padding-top:16px;font-size:13px;color:${INK};line-height:1.6;">
+          Best,<br>
+          <strong style="color:${NAVY};">${escapeHtml(userName || 'Service Team')}</strong>
+        </div>
+      </td></tr>
+
+      <!-- Footer bar -->
+      <tr><td style="background:${NAVY};padding:12px 28px;text-align:center;">
+        <div style="color:#FFFFFF;opacity:0.5;font-size:10px;letter-spacing:1px;text-transform:uppercase;">
+          Aspen Spas Internal · ${new Date().toLocaleString('en-US')}
+        </div>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
 }
 // ════════════════════════════════════════════════════════════
 function notifyCustomer(idx, opts){
@@ -2067,23 +2439,33 @@ function sendNotifications(idx, choices){
     channels.push('sms');
   }
 
-  // 2. Email to customer — download .eml file (reliable, opens in Mail.app on double-click)
+  // 2. Email to customer — download .eml file with BEAUTIFUL HTML body (renders in Outlook/Mail)
   if(choices.email){
     const tpl = templates[choices.email];
     const {subject, body} = renderTemplate(tpl, o);
+    // Map template key to short variant for HTML builder
+    const variant = choices.email.includes('reminder') ? 'reminder'
+                  : choices.email.includes('delivery_scheduled') ? 'delivery_scheduled'
+                  : 'arrived';
+    const daysSinceNotified = o.notifiedAt ? Math.max(1, Math.floor((Date.now() - new Date(o.notifiedAt).getTime()) / 86400000)) : 0;
+    const htmlBody = buildCustomerEmailHtml(o, variant, userName, daysSinceNotified);
     setTimeout(() => {
-      downloadEmailEml(email, subject, body, '', '');
+      downloadEmailEml(email, subject, body, '', '', htmlBody);
     }, choices.sms ? 1200 : 0);
     channels.push('email');
   }
 
-  // 3. Internal email to team — also via .eml file
+  // 3. Internal email to team — also HTML, structured briefing format
   if(choices.internal){
     const tpl = templates[choices.internal];
     const {subject, body} = renderTemplate(tpl, o);
     const rec = loadInternalRecipients();
+    const internalVariant = choices.internal.includes('bw_alert') ? 'bw_alert'
+                          : choices.internal.includes('pickup_pending') ? 'pickup_pending'
+                          : 'arrived';
+    const htmlBody = buildInternalEmailHtml(o, internalVariant, userName);
     setTimeout(() => {
-      downloadEmailEml(rec.to, subject, body, rec.cc || '', rec.from || '');
+      downloadEmailEml(rec.to, subject, body, rec.cc || '', rec.from || '', htmlBody);
     }, (choices.sms ? 1200 : 0) + (choices.email ? 800 : 0));
     channels.push('internal');
   }
