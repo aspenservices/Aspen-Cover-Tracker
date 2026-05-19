@@ -1315,6 +1315,7 @@ Thanks,
 
 // Default internal recipients (editable in Templates modal)
 const DEFAULT_INTERNAL_RECIPIENTS = {
+  from: 'service2@aspenspas.com',
   to: 'service1@aspenspas.com',
   cc: 'manu@aspenspas.com, peyton@aspenspas.com, dan@aspenspas.com, lana@aspenspas.com, seth@aspenspas.com, neil@aspenspas.com, service@aspenspas.com, tom@aspenspas.com, sam@aspenspas.com',
 };
@@ -1476,6 +1477,13 @@ function openTemplatesModal(){
         <div style="background:#F5F1E8;border:1px solid #E5D9C0;border-radius:10px;padding:14px;margin-bottom:18px;">
           <strong style="font-size:13px;display:block;margin-bottom:8px;">👥 Internal recipients</strong>
           <div style="margin-bottom:10px;">
+            <label style="font-size:11px;color:var(--ink-mute);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">FROM (your account)</label>
+            <input type="email" class="edit-field" id="recFrom" value="${escapeHtml(recipients.from || 'service2@aspenspas.com')}" placeholder="service2@aspenspas.com" style="width:100%;margin-top:4px;font-size:13px;font-family:'JetBrains Mono',monospace;">
+            <div style="font-size:10px;color:var(--ink-mute);margin-top:3px;line-height:1.4;">
+              ℹ️ The email app may use your default account. To send from <strong>service2</strong>, make sure it's added in Mac Mail / Outlook and select it manually when the email opens.
+            </div>
+          </div>
+          <div style="margin-bottom:10px;">
             <label style="font-size:11px;color:var(--ink-mute);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">TO</label>
             <input type="email" class="edit-field" id="recTo" value="${escapeHtml(recipients.to)}" style="width:100%;margin-top:4px;font-size:13px;font-family:'JetBrains Mono',monospace;">
           </div>
@@ -1560,6 +1568,7 @@ function openTemplatesModal(){
     if(recSave){
       recSave.onclick = () => {
         saveInternalRecipients({
+          from: document.getElementById('recFrom').value.trim(),
           to: document.getElementById('recTo').value.trim(),
           cc: document.getElementById('recCc').value.trim(),
         });
@@ -1780,11 +1789,14 @@ function sendNotifications(idx, choices){
     const tpl = templates[choices.internal];
     const {subject, body} = renderTemplate(tpl, o);
     const rec = loadInternalRecipients();
-    const params = new URLSearchParams({
+    const paramObj = {
       subject,
       body,
       cc: rec.cc || '',
-    });
+    };
+    // Some email clients (Outlook web, Apple Mail) honor &from= to suggest the sending account
+    if(rec.from) paramObj.from = rec.from;
+    const params = new URLSearchParams(paramObj);
     setTimeout(() => {
       window.open(`mailto:${rec.to}?${params.toString()}`, '_blank');
     }, (choices.sms ? 1200 : 0) + (choices.email ? 800 : 0));
@@ -3114,7 +3126,23 @@ function renderFilterChips(){
       primaryFilter = pf;
       activeFilter = null;
     } else if(el.dataset.f !== undefined){
-      activeFilter = activeFilter === el.dataset.f ? null : el.dataset.f;
+      // Click on a category chip: toggle it
+      const newCat = activeFilter === el.dataset.f ? null : el.dataset.f;
+      activeFilter = newCat;
+      // UX improvement: if a primary filter is active that would conflict with
+      // the new category (snoozed + scheduled, archive + arrived, etc.), reset primary
+      // so the click does something useful instead of giving "0 covers match".
+      if(newCat){
+        const incompatible =
+          (primaryFilter === 'SNOOZED' && newCat !== 'DELIVERED' && newCat !== 'INSTALLED') ||
+          (primaryFilter === 'ARCHIVE' && newCat !== 'DELIVERED' && newCat !== 'INSTALLED') ||
+          (primaryFilter === 'STOCK_ONLY' && newCat !== 'STOCK') ||
+          (primaryFilter === 'NOT_NOTIFIED' && (newCat === 'DELIVERED' || newCat === 'INSTALLED' || newCat === 'STOCK')) ||
+          (primaryFilter === 'NEEDS_REMINDER' && (newCat === 'DELIVERED' || newCat === 'INSTALLED' || newCat === 'STOCK')) ||
+          (primaryFilter === 'PICKUP' && (newCat === 'DELIVERED' || newCat === 'INSTALLED')) ||
+          (primaryFilter === 'BW' && (newCat === 'DELIVERED' || newCat === 'INSTALLED'));
+        if(incompatible) primaryFilter = null;
+      }
     }
     renderKPIs(); renderFilterChips(); applyFilters();
   }));
@@ -3242,15 +3270,49 @@ function applyFilters(){
       return 0;
     });
   } else {
-    // Default sort: respect Excel order, with manually-added covers at top
+    // ════════════════════════════════════════════════════════════
+    // SMART DEFAULT SORT — clean, professional, by-status grouping
+    // ════════════════════════════════════════════════════════════
+    // Group order (low number = top of list):
+    //   1. ARRIVED NEW (today)             — freshest, most actionable
+    //   2. SCHEDULED                       — already planned, customer notified
+    //   3. OUT FOR DELIVERY                — in transit today
+    //   4. ARRIVED (regular, not OLD)      — in warehouse, recent orders
+    //   5. PENDING / LATE / EXPECTED       — not yet arrived
+    //   6. STOCK                           — warehouse inventory
+    //   7. ARRIVED OLD orders (60+ days)   — stale orders, separated visually
+    //   8. SND / DROP SHIP                 — special types
+    //   9. DELIVERED / INSTALLED           — archive
+    //  10. SNOOZED                         — hidden by default but if visible, bottom
+    //
+    // Within each group: by checkedIn date DESC (newest first), or by orderDate
+    const today = todayStart();
+    function groupOf(o){
+      if(shouldAutoSnooze(o, today)) return 10;
+      if(o.category === 'DELIVERED' || o.category === 'INSTALLED') return 9;
+      if(o.category === 'SND' || o.category === 'DROP SHIP') return 8;
+      if(o.checkedIn && isOldOrder(o, 60) && o.category !== 'DELIVERED' && o.category !== 'INSTALLED') return 7;
+      if(o.isStock || o.category === 'STOCK') return 6;
+      if(o.category === 'PENDING' || o.category === 'LATE' || o.category === 'EXPECTED') return 5;
+      if(o.category === 'ARRIVED' && !isCheckedInToday(o.checkedIn)) return 4;
+      if(o.category === 'OUT FOR DELIVERY') return 3;
+      if(o.category === 'SCHEDULED') return 2;
+      if(o.category === 'ARRIVED' && isCheckedInToday(o.checkedIn)) return 1;
+      return 4; // fallback for other arrived
+    }
+    function dateScore(o){
+      // Within a group, higher score = higher on list (newer first)
+      const ci = o.checkedIn ? parseCheckedIn(o.checkedIn) : null;
+      if(ci) return ci.getTime();
+      const od = o.orderDate ? new Date(o.orderDate).getTime() : 0;
+      return od;
+    }
     view.sort((a,b) => {
-      const aHas = a.excelRow !== undefined && a.excelRow !== null;
-      const bHas = b.excelRow !== undefined && b.excelRow !== null;
-      if(!aHas && !bHas) return 0;       // both manual: keep insertion order
-      if(!aHas) return -1;                // a is manual, goes first
-      if(bHas && a.excelRow < b.excelRow) return -1;
-      if(bHas && a.excelRow > b.excelRow) return 1;
-      return 0;
+      const ga = groupOf(a);
+      const gb = groupOf(b);
+      if(ga !== gb) return ga - gb;
+      // Same group: newer checkedIn first (or newer order date if no checkedIn)
+      return dateScore(b) - dateScore(a);
     });
   }
   renderTable();
