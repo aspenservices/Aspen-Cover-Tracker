@@ -1793,6 +1793,8 @@ function openNotifyPicker(idx, opts){
   opts = opts || {};
   const o = allCovers[idx];
   const customer = (o.customerName || o.customer || '').split('—')[0].trim();
+  const phone = (o.customerPhone || '').replace(/[^0-9+]/g, '');
+  const email = (o.customerEmail || '').trim();
   const templates = loadTemplates();
   const isReminder = !!opts.reminder;
 
