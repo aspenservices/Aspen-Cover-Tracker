@@ -273,6 +273,15 @@
   .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .modal-foot{padding:16px 28px 24px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 
+  /* New JS-injected modal (backdrop+card pattern) */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(10,26,58,.45);backdrop-filter:blur(6px);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn .2s ease;}
+  .modal-card{background:var(--bg-card);border-radius:var(--radius-lg);width:100%;max-height:92vh;overflow:hidden;box-shadow:0 20px 60px rgba(10,26,58,.3);display:flex;flex-direction:column;animation:slideUp .25s ease;}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes slideUp{from{transform:translateY(20px) scale(.96);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
+  .modal-card .modal-head{padding:20px 24px;display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0;}
+  .modal-card .modal-body{padding:18px 24px;overflow-y:auto;flex:1;}
+
   /* Toggle group (Stock vs Customer cover) */
   .toggle-group{display:flex;background:var(--bg-elev);border-radius:var(--radius-sm);padding:4px;margin-bottom:16px;gap:2px}
   .toggle-group button{flex:1;padding:9px 12px;border:none;background:transparent;border-radius:6px;font-family:inherit;font-size:13px;font-weight:500;color:var(--ink-mute);cursor:pointer;transition:all .15s}
@@ -407,6 +416,7 @@
       <button class="btn btn-ghost hidden" id="deliveredReportBtn" title="See list of delivered/picked up covers — copy for SMS or email">✅ Delivered</button>
       <button class="btn btn-ghost hidden" id="cleanExcelBtn" title="Generate clean Excel — moves delivered/picked up to Archive sheet. Ready to email Manuela.">🧹 Clean Excel</button>
       <button class="btn btn-ghost hidden" id="weeklyReportBtn" title="Send weekly report to Tom">📊 Weekly</button>
+      <button class="btn btn-ghost hidden" id="templatesBtn" title="Edit message templates (SMS, email, internal)">⚙️ Templates</button>
       <button class="btn btn-gold hidden" id="exportXlsxBtn">📥 Export Excel</button>
       <button class="btn btn-ghost" id="reloadBtn">↻ Reload</button>
       <button class="btn btn-primary" id="uploadBtn">⬆ Upload Excel</button>
@@ -653,6 +663,7 @@
   <button class="bulk-primary" id="bulkArrived">✓ Mark arrived</button>
   <button id="bulkSchedule">📅 Schedule</button>
   <button id="bulkServiceLog" title="Send to TECH-TICKETS Service Log (works for any cover not yet delivered)" style="background:#B8924C;color:white;border-color:#B8924C;font-weight:600">🎫 Service Log</button>
+  <button id="bulkNotify" title="Notify selected customers (SMS + email)" style="background:#1E88E5;color:white;border-color:#1E88E5;font-weight:600">📧 Notify</button>
   <button id="bulkDelivered">🚚 Mark delivered</button>
   <button id="bulkInstalled">🔧 Mark installed</button>
   <button id="bulkUnmarkArrived" title="Unmark as arrived (for accidental marks)">↩️ Unmark arrived</button>
@@ -821,11 +832,20 @@ function readWorkbook(file){
           deliveryNotes: '',
           internalNotes: '',      // team notes, NOT overwritten by Excel
           spaSerial: '',          // linked spa serial number (cross-link with warehouse)
+          isBW: false,            // Bluewater Cover (special order)
+          isPickup: false,        // customer will pick up (no delivery scheduled)
+          customerPhone: '',
+          customerEmail: '',
           // Workflow timestamps
           scheduledAt: null,
           outForDeliveryAt: null,
           deliveredAt: null,
           installedAt: null,
+          // Customer notification tracking
+          notifiedAt: null,       // when customer was notified the cover arrived
+          notifiedBy: '',         // who sent the notification
+          notifiedVia: '',        // 'sms', 'email', 'both'
+          lastReminderAt: null,   // when last reminder was sent
           // Snooze (when task is complete or set aside)
           snoozedAt: null,
           // History of changes
@@ -934,10 +954,16 @@ async function offerFirebaseMigration(parsedFromExcel){
         deliveryNotes: fbMatch.deliveryNotes || '',
         internalNotes: fbMatch.internalNotes || '',
         spaSerial: fbMatch.spaSerial || '',
+        isBW: fbMatch.isBW || false,
+        isPickup: fbMatch.isPickup || false,
         history: fbMatch.history || [],
         customerPhone: fbMatch.customerPhone || '',
         customerEmail: fbMatch.customerEmail || '',
         customerName: fbMatch.customerName || excelCover.customer,
+        notifiedAt: fbMatch.notifiedAt || null,
+        notifiedBy: fbMatch.notifiedBy || '',
+        notifiedVia: fbMatch.notifiedVia || '',
+        lastReminderAt: fbMatch.lastReminderAt || null,
         scheduledAt: fbMatch.scheduledAt || null,
         outForDeliveryAt: fbMatch.outForDeliveryAt || null,
         deliveredAt: fbMatch.deliveredAt || null,
@@ -1136,6 +1162,652 @@ function markScheduled(idx){
   saveToStorage();
   render();
   toast(`📅 ${o.customer} scheduled for delivery`, 'success');
+}
+
+// ════════════════════════════════════════════════════════════
+// MESSAGE TEMPLATES SYSTEM
+// ════════════════════════════════════════════════════════════
+const DEFAULT_TEMPLATES = {
+  // ── Customer SMS ─────────────────────────────────────
+  customer_sms_arrived: {
+    label: '📞 SMS · Cover arrived — pickup',
+    audience: 'customer',
+    channel: 'sms',
+    subject: '',
+    body: `Hi {customer}, this is Aspen Spas. Great news — your {coverType} cover has arrived and is ready for pickup at our warehouse (4609 McRee Ave, St. Louis, MO 63110). Hours: Mon-Fri 8am-5pm. Call (314) 776-5050 with questions. Thank you!`,
+  },
+  customer_sms_reminder: {
+    label: '⏰ SMS · Pickup reminder (3+ days)',
+    audience: 'customer',
+    channel: 'sms',
+    subject: '',
+    body: `Hi {customer}, friendly reminder from Aspen Spas. Your {coverType} cover (PO# {po}) has been ready for pickup for {daysSinceNotified} days. Warehouse: 4609 McRee Ave, St. Louis, MO 63110, Mon-Fri 8am-5pm. Need delivery instead? Call (314) 776-5050. Thank you!`,
+  },
+  customer_sms_delivery_today: {
+    label: '🚚 SMS · Delivery today',
+    audience: 'customer',
+    channel: 'sms',
+    subject: '',
+    body: `Hi {customer}, Aspen Spas here. Our technician {tech} is on the way today to deliver and install your {coverType} cover. They'll call before arriving. Thanks!`,
+  },
+  // ── Customer Email ───────────────────────────────────
+  customer_email_arrived: {
+    label: '✉️ Email · Cover arrived — pickup',
+    audience: 'customer',
+    channel: 'email',
+    subject: `Your Aspen Spas {coverType} cover has arrived — ready for pickup`,
+    body: `Hi {customerFull},
+
+Great news — your {coverType} cover has arrived at our warehouse and is ready for pickup!
+
+📍 Pickup location:
+Aspen Spas
+4609 McRee Avenue
+St. Louis, MO 63110
+
+🕐 Hours: Monday–Friday, 8:00 AM – 5:00 PM
+
+📞 Questions? Call us at (314) 776-5050
+
+If you'd prefer delivery and installation instead of pickup, please let us know and we'll schedule a visit at your convenience.
+
+Thank you for choosing Aspen Spas!
+
+Kind regards,
+Service Department
+Aspen Spas`,
+  },
+  customer_email_reminder: {
+    label: '⏰ Email · Pickup reminder (3+ days)',
+    audience: 'customer',
+    channel: 'email',
+    subject: `Reminder: your Aspen Spas cover is waiting for pickup`,
+    body: `Hi {customerFull},
+
+This is a friendly reminder that your {coverType} cover (PO# {po}) has been ready for pickup at our warehouse for {daysSinceNotified} days.
+
+📍 Pickup location:
+Aspen Spas — 4609 McRee Avenue, St. Louis, MO 63110
+🕐 Hours: Mon–Fri, 8:00 AM – 5:00 PM
+
+If pickup is not convenient, we'd be happy to schedule delivery and installation. Just reply to this email or call us at (314) 776-5050.
+
+Thank you,
+Service Department
+Aspen Spas`,
+  },
+  customer_email_delivery_scheduled: {
+    label: '📅 Email · Delivery scheduled',
+    audience: 'customer',
+    channel: 'email',
+    subject: `Your Aspen Spas delivery is scheduled`,
+    body: `Hi {customerFull},
+
+This confirms your {coverType} cover delivery is scheduled. Our technician will reach out to confirm the time window the day before.
+
+📦 PO#: {po}
+📍 Delivery address: {address}
+
+Thank you for your patience!
+
+Kind regards,
+Service Department
+Aspen Spas`,
+  },
+  // ── Internal (coworker) Email ────────────────────────
+  internal_email_arrived: {
+    label: '👥 Internal · Cover arrived alert',
+    audience: 'internal',
+    channel: 'email',
+    subject: `Cover arrived: {customer} (PO# {po})`,
+    body: `Hi team,
+
+Quick FYI — the {coverType} cover for {customerFull} (PO# {po}) arrived at the warehouse today.
+
+• Phone: {phone}
+• Address: {address}
+• Order date: {orderDate}
+
+I'll {pickupOrDeliverAction}. Let me know if anything is needed.
+
+Thanks,
+{myName}`,
+  },
+  internal_email_pickup_pending: {
+    label: '👥 Internal · Pickup pending alert',
+    audience: 'internal',
+    channel: 'email',
+    subject: `Pickup pending: {customer} ({daysSinceNotified} days since notification)`,
+    body: `Hi team,
+
+This {coverType} cover has been waiting for pickup for {daysSinceNotified} days since I notified the customer:
+
+• Customer: {customerFull}
+• PO#: {po}
+• Phone: {phone}
+• Notified on: {notifiedDate}
+
+Should we follow up or offer to schedule delivery?
+
+Thanks,
+{myName}`,
+  },
+  internal_email_bw_alert: {
+    label: '🌊 Internal · BW cover requires attention',
+    audience: 'internal',
+    channel: 'email',
+    subject: `Bluewater cover arrived — {customer} (PO# {po})`,
+    body: `Hi team,
+
+A Bluewater (BW) cover arrived today — please note this is a special-order cover, not a standard Aspen.
+
+• Customer: {customerFull}
+• PO#: {po}
+• Phone: {phone}
+• Address: {address}
+
+Make sure delivery and install paperwork reflects "BW" for the tech.
+
+Thanks,
+{myName}`,
+  },
+};
+
+// Default internal recipients (editable in Templates modal)
+const DEFAULT_INTERNAL_RECIPIENTS = {
+  to: 'service1@aspenspas.com',
+  cc: 'manu@aspenspas.com, peyton@aspenspas.com, dan@aspenspas.com, lana@aspenspas.com, seth@aspenspas.com, neil@aspenspas.com, service@aspenspas.com, tom@aspenspas.com, sam@aspenspas.com',
+};
+
+const TEMPLATES_KEY = 'aspen_templates_v1';
+const TEMPLATES_RECIPIENTS_KEY = 'aspen_templates_recipients_v1';
+
+function loadTemplates(){
+  try {
+    const custom = JSON.parse(localStorage.getItem(TEMPLATES_KEY) || '{}');
+    const merged = {};
+    Object.keys(DEFAULT_TEMPLATES).forEach(k => {
+      merged[k] = {...DEFAULT_TEMPLATES[k], ...(custom[k]||{})};
+    });
+    // Also include any extras the user added
+    Object.keys(custom).forEach(k => { if(!merged[k]) merged[k] = custom[k]; });
+    return merged;
+  } catch(e){ return {...DEFAULT_TEMPLATES}; }
+}
+
+function saveTemplate(key, patch){
+  try {
+    const custom = JSON.parse(localStorage.getItem(TEMPLATES_KEY) || '{}');
+    custom[key] = {...(custom[key]||{}), ...patch};
+    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(custom));
+  } catch(e){ console.warn('saveTemplate failed:', e); }
+}
+
+function resetTemplate(key){
+  try {
+    const custom = JSON.parse(localStorage.getItem(TEMPLATES_KEY) || '{}');
+    delete custom[key];
+    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(custom));
+  } catch(e){}
+}
+
+function loadInternalRecipients(){
+  try {
+    return JSON.parse(localStorage.getItem(TEMPLATES_RECIPIENTS_KEY) || JSON.stringify(DEFAULT_INTERNAL_RECIPIENTS));
+  } catch(e){ return {...DEFAULT_INTERNAL_RECIPIENTS}; }
+}
+
+function saveInternalRecipients(rec){
+  localStorage.setItem(TEMPLATES_RECIPIENTS_KEY, JSON.stringify(rec));
+}
+
+function coverVars(o){
+  const fullName = (o.customerName || o.customer || '').split('—')[0].trim();
+  const firstName = fullName.split(/[\s,]+/).filter(Boolean)[0] || fullName;
+  const checkInDate = o.checkedIn ? parseCheckedIn(o.checkedIn) : null;
+  const daysSinceArrival = checkInDate ? Math.max(1, Math.floor((Date.now() - checkInDate.getTime()) / 86400000)) : 0;
+  const daysSinceNotified = o.notifiedAt ? Math.max(1, Math.floor((Date.now() - new Date(o.notifiedAt).getTime()) / 86400000)) : 0;
+  return {
+    '{customer}': firstName,
+    '{customerFull}': fullName,
+    '{po}': o.poNumber || 'N/A',
+    '{date}': new Date().toLocaleDateString('en-US'),
+    '{address}': o.deliveryAddress || '[address not on file]',
+    '{phone}': o.customerPhone || '[phone not on file]',
+    '{email}': o.customerEmail || '[email not on file]',
+    '{coverType}': o.isBW ? 'Bluewater (BW)' : 'spa',
+    '{orderDate}': fmtDate(o.orderDate) || '?',
+    '{daysWaiting}': String(daysSinceArrival),
+    '{daysSinceNotified}': String(daysSinceNotified),
+    '{notifiedDate}': o.notifiedAt ? new Date(o.notifiedAt).toLocaleDateString('en-US') : '—',
+    '{pickupOrDeliverAction}': o.isPickup ? 'wait for customer to pick up' : 'coordinate delivery with them',
+    '{myName}': localStorage.getItem('aspen_user_name') || 'Service',
+    '{tech}': o.deliveryTech || 'our technician',
+  };
+}
+
+function renderTemplate(tpl, cover){
+  const vars = coverVars(cover);
+  const sub = (s) => Object.entries(vars).reduce((acc, [k,v]) => acc.split(k).join(v), s||'');
+  return {subject: sub(tpl.subject), body: sub(tpl.body)};
+}
+
+// ════════════════════════════════════════════════════════════
+// TEMPLATES MANAGER MODAL — view/edit/reset all message templates
+// ════════════════════════════════════════════════════════════
+function openTemplatesModal(){
+  const templates = loadTemplates();
+  const recipients = loadInternalRecipients();
+  let activeTab = 'customer_sms';
+
+  const modal = document.createElement('div');
+  modal.id = 'templatesModal';
+  modal.className = 'modal-backdrop';
+  modal.innerHTML = `
+    <div class="modal-card" style="max-width:780px;max-height:90vh;display:flex;flex-direction:column;">
+      <div class="modal-head" style="border-bottom:1px solid var(--line);">
+        <div>
+          <h3 style="margin:0;font-family:'Fraunces',serif;font-style:italic;">⚙️ Message Templates</h3>
+          <div style="font-size:12px;color:var(--ink-mute);margin-top:4px;">
+            Edit the SMS and email templates used when notifying customers and coworkers.
+          </div>
+        </div>
+        <button class="modal-close" id="tplClose">✕</button>
+      </div>
+
+      <div style="display:flex;border-bottom:1px solid var(--line);background:#FAF7EF;flex-shrink:0;">
+        <button class="tpl-tab" data-tab="customer_sms" style="flex:1;padding:14px;border:none;background:transparent;font-weight:600;font-size:13px;cursor:pointer;border-bottom:3px solid var(--gold);color:var(--ink);">📞 Customer SMS</button>
+        <button class="tpl-tab" data-tab="customer_email" style="flex:1;padding:14px;border:none;background:transparent;font-weight:500;font-size:13px;cursor:pointer;border-bottom:3px solid transparent;color:var(--ink-mute);">✉️ Customer Email</button>
+        <button class="tpl-tab" data-tab="internal" style="flex:1;padding:14px;border:none;background:transparent;font-weight:500;font-size:13px;cursor:pointer;border-bottom:3px solid transparent;color:var(--ink-mute);">👥 Internal Email</button>
+      </div>
+
+      <div class="modal-body" id="tplBody" style="padding:20px 24px;overflow-y:auto;flex:1;"></div>
+
+      <div style="padding:14px 24px;border-top:1px solid var(--line);background:#FAF7EF;flex-shrink:0;">
+        <details style="font-size:12px;">
+          <summary style="cursor:pointer;color:var(--gold);font-weight:600;">📋 Available variables (click to copy)</summary>
+          <div id="varsList" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </details>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  // Variables list
+  const sampleVars = coverVars({customer:'Smith, John', poNumber:'25388', deliveryAddress:'123 Main St', customerPhone:'314-555-0123', customerEmail:'john@example.com', isBW:false, orderDate:new Date(), checkedIn:'Here 5/12', isPickup:false});
+  const varsList = document.getElementById('varsList');
+  Object.entries(sampleVars).forEach(([k,v]) => {
+    const chip = document.createElement('span');
+    chip.textContent = k;
+    chip.title = `e.g. "${v}" — click to copy`;
+    chip.style.cssText = 'padding:4px 10px;background:#FFF;border:1px solid #E5D9C0;border-radius:6px;font-family:"JetBrains Mono",monospace;font-size:11px;cursor:pointer;';
+    chip.onclick = () => { navigator.clipboard.writeText(k).then(()=>toast('Copied '+k, 'ok')); };
+    varsList.appendChild(chip);
+  });
+
+  function renderTab(tab){
+    activeTab = tab;
+    // Update tab styling
+    modal.querySelectorAll('.tpl-tab').forEach(b => {
+      const active = b.dataset.tab === tab;
+      b.style.borderBottom = '3px solid ' + (active ? 'var(--gold)' : 'transparent');
+      b.style.fontWeight = active ? '600' : '500';
+      b.style.color = active ? 'var(--ink)' : 'var(--ink-mute)';
+    });
+
+    const tplBody = document.getElementById('tplBody');
+    const allTpls = loadTemplates();
+    let keys, intro;
+    if(tab === 'customer_sms'){
+      keys = Object.keys(allTpls).filter(k => allTpls[k].audience==='customer' && allTpls[k].channel==='sms');
+      intro = 'SMS sent directly to the customer. Keep it under 320 characters so it doesn\'t split into multiple messages.';
+    } else if(tab === 'customer_email'){
+      keys = Object.keys(allTpls).filter(k => allTpls[k].audience==='customer' && allTpls[k].channel==='email');
+      intro = 'Email sent to the customer\'s email address. Will open in your default email app.';
+    } else {
+      keys = Object.keys(allTpls).filter(k => allTpls[k].audience==='internal');
+      intro = 'Internal email sent to your coworkers. Recipients are configured below.';
+    }
+
+    let html = `<div style="font-size:12px;color:var(--ink-mute);margin-bottom:14px;line-height:1.5;">${intro}</div>`;
+
+    if(tab === 'internal'){
+      html += `
+        <div style="background:#F5F1E8;border:1px solid #E5D9C0;border-radius:10px;padding:14px;margin-bottom:18px;">
+          <strong style="font-size:13px;display:block;margin-bottom:8px;">👥 Internal recipients</strong>
+          <div style="margin-bottom:10px;">
+            <label style="font-size:11px;color:var(--ink-mute);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">TO</label>
+            <input type="email" class="edit-field" id="recTo" value="${escapeHtml(recipients.to)}" style="width:100%;margin-top:4px;font-size:13px;font-family:'JetBrains Mono',monospace;">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--ink-mute);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">CC (comma-separated)</label>
+            <textarea class="edit-field" id="recCc" rows="2" style="width:100%;margin-top:4px;font-size:12px;font-family:'JetBrains Mono',monospace;line-height:1.5;">${escapeHtml(recipients.cc)}</textarea>
+          </div>
+          <button class="btn" id="recSave" style="margin-top:8px;background:var(--gold);color:#FFF;border-color:var(--gold);font-weight:600;font-size:12px;">💾 Save recipients</button>
+        </div>
+      `;
+    }
+
+    keys.forEach(key => {
+      const tpl = allTpls[key];
+      const isCustom = (() => {
+        try { return Object.keys(JSON.parse(localStorage.getItem(TEMPLATES_KEY)||'{}')).includes(key); } catch(e){ return false; }
+      })();
+      const isDefault = !!DEFAULT_TEMPLATES[key];
+      html += `
+        <div style="border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px;background:#FFF;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <strong style="font-size:13px;">${escapeHtml(tpl.label)}</strong>
+            <div style="display:flex;gap:6px;align-items:center;">
+              ${isCustom ? '<span style="font-size:10px;color:var(--gold);font-weight:600;letter-spacing:0.5px;">✦ MODIFIED</span>' : '<span style="font-size:10px;color:var(--ink-mute);font-weight:600;letter-spacing:0.5px;">DEFAULT</span>'}
+            </div>
+          </div>
+          ${tpl.channel === 'email' ? `
+            <label style="font-size:11px;color:var(--ink-mute);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Subject</label>
+            <input type="text" class="edit-field tpl-subject" data-key="${key}" value="${escapeHtml(tpl.subject)}" style="width:100%;margin-top:4px;margin-bottom:10px;font-size:13px;">
+          ` : ''}
+          <label style="font-size:11px;color:var(--ink-mute);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Body</label>
+          <textarea class="edit-field tpl-body" data-key="${key}" rows="${tpl.channel==='sms'?4:10}" style="width:100%;margin-top:4px;font-family:${tpl.channel==='sms'?'system-ui,sans-serif':'inherit'};font-size:13px;line-height:1.5;">${escapeHtml(tpl.body)}</textarea>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+            <div style="font-size:11px;color:var(--ink-mute);">${tpl.channel==='sms' ? `<span id="charCount-${key}">${tpl.body.length}</span> / 320 chars` : `${tpl.body.length} chars`}</div>
+            <div style="display:flex;gap:6px;">
+              ${isCustom ? `<button class="btn tpl-reset" data-key="${key}" style="font-size:11px;padding:4px 10px;color:#C00;border-color:#FFCFCF;">↩ Reset to default</button>` : ''}
+              <button class="btn tpl-save" data-key="${key}" style="font-size:11px;padding:4px 10px;background:var(--gold);color:#FFF;border-color:var(--gold);font-weight:600;">💾 Save</button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    tplBody.innerHTML = html;
+
+    // Wire SMS char counters
+    tplBody.querySelectorAll('.tpl-body').forEach(ta => {
+      const key = ta.dataset.key;
+      const tpl = allTpls[key];
+      if(tpl.channel === 'sms'){
+        const counter = document.getElementById('charCount-'+key);
+        ta.addEventListener('input', () => { if(counter){ counter.textContent = ta.value.length; counter.style.color = ta.value.length > 320 ? '#C00' : 'var(--ink-mute)'; } });
+      }
+    });
+
+    // Save handlers
+    tplBody.querySelectorAll('.tpl-save').forEach(btn => {
+      btn.onclick = () => {
+        const key = btn.dataset.key;
+        const subj = tplBody.querySelector(`.tpl-subject[data-key="${key}"]`);
+        const body = tplBody.querySelector(`.tpl-body[data-key="${key}"]`);
+        const patch = {body: body.value};
+        if(subj) patch.subject = subj.value;
+        saveTemplate(key, patch);
+        toast(`💾 Saved: ${allTpls[key].label}`, 'success');
+        renderTab(activeTab);
+      };
+    });
+
+    // Reset handlers
+    tplBody.querySelectorAll('.tpl-reset').forEach(btn => {
+      btn.onclick = () => {
+        if(!confirm('Reset to default? Your custom version will be lost.')) return;
+        resetTemplate(btn.dataset.key);
+        toast(`↩ Reset to default`, 'ok');
+        renderTab(activeTab);
+      };
+    });
+
+    // Recipients save
+    const recSave = document.getElementById('recSave');
+    if(recSave){
+      recSave.onclick = () => {
+        saveInternalRecipients({
+          to: document.getElementById('recTo').value.trim(),
+          cc: document.getElementById('recCc').value.trim(),
+        });
+        toast('💾 Recipients saved', 'success');
+      };
+    }
+  }
+
+  modal.querySelectorAll('.tpl-tab').forEach(b => {
+    b.onclick = () => renderTab(b.dataset.tab);
+  });
+  renderTab('customer_sms');
+
+  const close = () => modal.remove();
+  document.getElementById('tplClose').onclick = close;
+  modal.onclick = (e) => { if(e.target === modal) close(); };
+}
+
+function parseCheckedIn(str){
+  // "Here 5/12" → Date object for May 12, current year
+  if(!str) return null;
+  const m = String(str).match(/(\d{1,2})\/(\d{1,2})/);
+  if(!m) return null;
+  return new Date(new Date().getFullYear(), parseInt(m[1])-1, parseInt(m[2]));
+}
+
+// ════════════════════════════════════════════════════════════
+// NOTIFY CUSTOMER — picker + render template + sms/mailto
+// ════════════════════════════════════════════════════════════
+function notifyCustomer(idx, opts){
+  opts = opts || {};
+  const o = allCovers[idx];
+  if(!o) return;
+
+  const customer = (o.customerName || o.customer || '').split('—')[0].trim();
+  const phone = (o.customerPhone || '').replace(/[^0-9+]/g, '');
+  const email = (o.customerEmail || '').trim();
+
+  if(!phone && !email){
+    if(!confirm(`No phone or email on file for ${customer}.\n\nAdd contact info in the "Customer" section first, then come back to notify.\n\nOR continue anyway and just log the notification?`)) return;
+  }
+
+  // Open the picker modal — user chooses which templates to send
+  openNotifyPicker(idx, opts);
+}
+
+// Picker UI for choosing which templates to send
+function openNotifyPicker(idx, opts){
+  opts = opts || {};
+  const o = allCovers[idx];
+  const customer = (o.customerName || o.customer || '').split('—')[0].trim();
+  const templates = loadTemplates();
+  const isReminder = !!opts.reminder;
+
+  // Pre-select sensible defaults
+  const defaultSmsKey = isReminder ? 'customer_sms_reminder' : 'customer_sms_arrived';
+  const defaultEmailKey = isReminder ? 'customer_email_reminder' : 'customer_email_arrived';
+  const defaultInternalKey = o.isBW ? 'internal_email_bw_alert' : (isReminder ? 'internal_email_pickup_pending' : 'internal_email_arrived');
+
+  // Build options grouped by audience
+  const customerSmsOpts = Object.entries(templates).filter(([k,t])=>t.audience==='customer'&&t.channel==='sms');
+  const customerEmailOpts = Object.entries(templates).filter(([k,t])=>t.audience==='customer'&&t.channel==='email');
+  const internalOpts = Object.entries(templates).filter(([k,t])=>t.audience==='internal');
+
+  const modal = document.createElement('div');
+  modal.id = 'notifyPickerModal';
+  modal.className = 'modal-backdrop';
+  modal.innerHTML = `
+    <div class="modal-card" style="max-width:620px;">
+      <div class="modal-head">
+        <div>
+          <h3 style="margin:0;font-family:'Fraunces',serif;font-style:italic;">Notify ${escapeHtml(customer)}</h3>
+          <div style="font-size:12px;color:var(--ink-mute);margin-top:4px;">
+            ${o.isBW ? '<span style="color:#0D47A1;font-weight:600;">🌊 BW cover</span> · ' : ''}
+            PO# ${escapeHtml(String(o.poNumber||'N/A'))} ·
+            ${o.customerPhone ? '📞 ' + escapeHtml(o.customerPhone) : '<span style="color:#C00;">no phone</span>'} ·
+            ${o.customerEmail ? '✉️ ' + escapeHtml(o.customerEmail) : '<span style="color:#C00;">no email</span>'}
+          </div>
+        </div>
+        <button class="modal-close" id="notifyPickerClose">✕</button>
+      </div>
+      <div class="modal-body" style="padding:20px 24px;">
+
+        <div style="margin-bottom:18px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong style="font-size:13px;color:var(--ink);">📞 SMS to customer</strong>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-mute);">
+              <input type="checkbox" id="sendSms" ${phone?'checked':''} ${!phone?'disabled':''}> Send
+            </label>
+          </div>
+          <select id="smsTplKey" class="edit-field" style="width:100%;font-size:13px;">
+            ${customerSmsOpts.map(([k,t])=>`<option value="${k}" ${k===defaultSmsKey?'selected':''}>${escapeHtml(t.label)}</option>`).join('')}
+          </select>
+        </div>
+
+        <div style="margin-bottom:18px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong style="font-size:13px;color:var(--ink);">✉️ Email to customer</strong>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-mute);">
+              <input type="checkbox" id="sendEmail" ${email?'checked':''} ${!email?'disabled':''}> Send
+            </label>
+          </div>
+          <select id="emailTplKey" class="edit-field" style="width:100%;font-size:13px;">
+            ${customerEmailOpts.map(([k,t])=>`<option value="${k}" ${k===defaultEmailKey?'selected':''}>${escapeHtml(t.label)}</option>`).join('')}
+          </select>
+        </div>
+
+        <div style="margin-bottom:18px;padding:14px;background:#F5F1E8;border-radius:10px;border:1px solid #E5D9C0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong style="font-size:13px;color:var(--ink);">👥 CC team (internal email)</strong>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-mute);">
+              <input type="checkbox" id="sendInternal" ${o.isBW?'checked':''}> Send to team
+            </label>
+          </div>
+          <select id="internalTplKey" class="edit-field" style="width:100%;font-size:13px;">
+            ${internalOpts.map(([k,t])=>`<option value="${k}" ${k===defaultInternalKey?'selected':''}>${escapeHtml(t.label)}</option>`).join('')}
+          </select>
+          <div style="font-size:11px;color:var(--ink-mute);margin-top:6px;">
+            Will email recipients configured in Templates ⚙️
+          </div>
+        </div>
+
+        <details style="margin-bottom:16px;">
+          <summary style="cursor:pointer;font-size:12px;color:var(--gold);font-weight:600;">👁️ Preview messages</summary>
+          <div id="notifyPreview" style="margin-top:10px;font-size:11px;background:#FAF7EF;padding:12px;border-radius:8px;border:1px solid #E5D9C0;max-height:240px;overflow-y:auto;font-family:'JetBrains Mono',monospace;white-space:pre-wrap;color:var(--ink);"></div>
+        </details>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--line);padding-top:14px;">
+          <button class="btn" id="notifyPickerCancel">Cancel</button>
+          <button class="btn btn-primary" id="notifyPickerSend" style="background:#1E88E5;color:#FFF;border-color:#1E88E5;font-weight:600;">📧 Send now</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  function refreshPreview(){
+    const previewBox = document.getElementById('notifyPreview');
+    const parts = [];
+    if(document.getElementById('sendSms').checked){
+      const tpl = loadTemplates()[document.getElementById('smsTplKey').value];
+      const {body} = renderTemplate(tpl, o);
+      parts.push(`── SMS ──\n${body}`);
+    }
+    if(document.getElementById('sendEmail').checked){
+      const tpl = loadTemplates()[document.getElementById('emailTplKey').value];
+      const {subject, body} = renderTemplate(tpl, o);
+      parts.push(`── EMAIL ──\nSubject: ${subject}\n\n${body}`);
+    }
+    if(document.getElementById('sendInternal').checked){
+      const tpl = loadTemplates()[document.getElementById('internalTplKey').value];
+      const {subject, body} = renderTemplate(tpl, o);
+      const rec = loadInternalRecipients();
+      parts.push(`── INTERNAL EMAIL ──\nTo: ${rec.to}\nCC: ${rec.cc}\nSubject: ${subject}\n\n${body}`);
+    }
+    previewBox.textContent = parts.join('\n\n');
+  }
+
+  ['sendSms','sendEmail','sendInternal','smsTplKey','emailTplKey','internalTplKey'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('change', refreshPreview);
+  });
+  refreshPreview();
+
+  const close = () => modal.remove();
+  document.getElementById('notifyPickerClose').onclick = close;
+  document.getElementById('notifyPickerCancel').onclick = close;
+  modal.onclick = (e) => { if(e.target === modal) close(); };
+
+  document.getElementById('notifyPickerSend').onclick = () => {
+    const wantSms = document.getElementById('sendSms').checked && phone;
+    const wantEmail = document.getElementById('sendEmail').checked && email;
+    const wantInternal = document.getElementById('sendInternal').checked;
+    if(!wantSms && !wantEmail && !wantInternal){
+      alert('Select at least one channel.');
+      return;
+    }
+    sendNotifications(idx, {
+      sms: wantSms ? document.getElementById('smsTplKey').value : null,
+      email: wantEmail ? document.getElementById('emailTplKey').value : null,
+      internal: wantInternal ? document.getElementById('internalTplKey').value : null,
+      reminder: !!opts.reminder,
+    });
+    close();
+  };
+}
+
+function sendNotifications(idx, choices){
+  const o = allCovers[idx];
+  if(!o) return;
+  const templates = loadTemplates();
+  const userName = localStorage.getItem('aspen_user_name') || 'Service';
+  const phone = (o.customerPhone || '').replace(/[^0-9+]/g, '');
+  const email = (o.customerEmail || '').trim();
+  const channels = [];
+
+  // 1. SMS to customer
+  if(choices.sms){
+    const tpl = templates[choices.sms];
+    const {body} = renderTemplate(tpl, o);
+    const sep = /Mac|iPhone|iPad/.test(navigator.platform) ? '&' : '?';
+    window.open(`sms:${phone}${sep}body=${encodeURIComponent(body)}`, '_self');
+    channels.push('sms');
+  }
+
+  // 2. Email to customer (delay if SMS was opened first)
+  if(choices.email){
+    const tpl = templates[choices.email];
+    const {subject, body} = renderTemplate(tpl, o);
+    setTimeout(() => {
+      window.open(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+    }, choices.sms ? 1200 : 0);
+    channels.push('email');
+  }
+
+  // 3. Internal email to team
+  if(choices.internal){
+    const tpl = templates[choices.internal];
+    const {subject, body} = renderTemplate(tpl, o);
+    const rec = loadInternalRecipients();
+    const params = new URLSearchParams({
+      subject,
+      body,
+      cc: rec.cc || '',
+    });
+    setTimeout(() => {
+      window.open(`mailto:${rec.to}?${params.toString()}`, '_blank');
+    }, (choices.sms ? 1200 : 0) + (choices.email ? 800 : 0));
+    channels.push('internal');
+  }
+
+  // Log the notification on the cover
+  if(choices.reminder){
+    o.lastReminderAt = new Date();
+    logChange(o, 'customer_reminder_sent', {channels: channels.join('+')});
+  } else {
+    o.notifiedAt = new Date();
+    o.notifiedBy = userName;
+    o.notifiedVia = channels.join(' + ');
+    logChange(o, 'customer_notified', {channels: channels.join('+'), bw: o.isBW});
+  }
+  o.modified = true;
+  changeCount++;
+  saveToStorage();
+  render();
+
+  setTimeout(() => openDrawer(idx), 100);
+  toast(`📧 ${choices.reminder?'Reminder':'Notification'} sent via ${channels.join(' + ')}`, 'success');
 }
 
 function markOutForDelivery(idx){
@@ -1395,14 +2067,17 @@ function openInTechTickets(idx, mode){
   const po = String(o.poNumber || '');
 
   let type, notes;
+  const isBW = !!o.isBW;
+  const bwPrefix = isBW ? '🌊 BLUEWATER (BW) — special-order cover\n' : '';
   if(mode === 'schedule'){
     type = 'cover_delivery_schedule';
     const lines = [
-      '📦 Cover arrived at warehouse — pending delivery schedule.',
+      bwPrefix + '📦 Cover arrived at warehouse — pending delivery schedule.',
       `Customer: ${customer}`,
       `PO# ${po || 'N/A'}`,
       `Arrived: ${o.checkedIn || 'today'}`,
     ];
+    if(isBW) lines.push('⚠️ This is a BLUEWATER COVER (BW) — special order, not standard Aspen');
     if(o.spaSerial) lines.push(`Linked spa: ${o.spaSerial}`);
     if(o.deliveryAddress) lines.push(`Destination: ${o.deliveryAddress}`);
     if(o.customerPhone) lines.push(`Customer phone: ${o.customerPhone}`);
@@ -1412,7 +2087,7 @@ function openInTechTickets(idx, mode){
     notes = lines.join('\n');
   } else {
     type = 'cover_install';
-    notes = `Cover delivered ${fmtDate(o.deliveryDate || o.deliveredAt)}. Destination: ${o.deliveryAddress||'TBD'}. Tech: ${o.deliveryTech||'TBD'}.${o.deliveryNotes ? ' Notes: '+o.deliveryNotes : ''}`;
+    notes = `${bwPrefix}Cover delivered ${fmtDate(o.deliveryDate || o.deliveredAt)}. Destination: ${o.deliveryAddress||'TBD'}. Tech: ${o.deliveryTech||'TBD'}.${o.deliveryNotes ? ' Notes: '+o.deliveryNotes : ''}`;
   }
 
   const params = new URLSearchParams({
@@ -1423,14 +2098,18 @@ function openInTechTickets(idx, mode){
     notes: notes,
     tech: o.deliveryTech || '',
     phone: o.customerPhone || '',
+    address: o.deliveryAddress || '',
+    bw: isBW ? '1' : '0',
+    // Cache buster — forces TECH-TICKETS to reload fresh JS, not stale cache
+    _t: String(Date.now()),
   });
   const url = `https://aspenservices.github.io/TECH-TICKETS/?${params.toString()}`;
   window.open(url, '_blank');
   toast(mode === 'schedule'
-    ? '🎫 Pending ticket added to Service Log — manager will schedule'
-    : '🎫 Install ticket pre-filled');
+    ? `🎫 ${isBW?'🌊 BW ':''}Pending ticket added to Service Log — manager will schedule`
+    : `🎫 ${isBW?'🌊 BW ':''}Install ticket pre-filled`);
   // Log this action
-  logChange(o, 'ticket_created', {mode});
+  logChange(o, 'ticket_created', {mode, bw: isBW});
   saveToStorage();
 }
 
@@ -1625,6 +2304,7 @@ function render(){
   $('#addStockBtn').classList.remove('hidden');
   $('#exportXlsxBtn').classList.remove('hidden');
   $('#weeklyReportBtn').classList.remove('hidden');
+  $('#templatesBtn').classList.remove('hidden');
   $('#cleanExcelBtn').classList.remove('hidden');
   $('#deliveredReportBtn').classList.remove('hidden');
 
@@ -2392,10 +3072,30 @@ function renderFilterChips(){
   }).length;
   const snoozedCount = allCovers.filter(o => shouldAutoSnooze(o, today)).length;
 
+  const notNotifiedCount = allCovers.filter(o => {
+    if(!o.checkedIn || o.notifiedAt) return false;
+    if(o.category === 'DELIVERED' || o.category === 'INSTALLED' || o.category === 'STOCK') return false;
+    if(o.isStock || /drop.?ship/i.test(o.notes||'')) return false;
+    return true;
+  }).length;
+  const pickupCount = allCovers.filter(o => o.isPickup && o.category !== 'DELIVERED' && o.category !== 'INSTALLED').length;
+  const bwCount = allCovers.filter(o => o.isBW && o.category !== 'DELIVERED' && o.category !== 'INSTALLED').length;
+  const needsReminderCount = allCovers.filter(o => {
+    if(!o.notifiedAt || o.deliveredAt || o.installedAt) return false;
+    const days = Math.floor((Date.now() - new Date(o.notifiedAt).getTime()) / 86400000);
+    if(days < 3) return false;
+    if(o.lastReminderAt && (Date.now() - new Date(o.lastReminderAt).getTime()) < 3*86400000) return false;
+    return true;
+  }).length;
+
   const primaryChips = [
     {f:'ACTIVE', label:'🔵 Active (in flow)'},
     {f:'ARCHIVE', label:'🟢 Archive (delivered)'},
     {f:'STOCK_ONLY', label:'🟡 Stock only'},
+    {f:'NOT_NOTIFIED', label:`📧 Sin notificar${notNotifiedCount?' · '+notNotifiedCount:''}`},
+    {f:'NEEDS_REMINDER', label:`⏰ Needs reminder${needsReminderCount?' · '+needsReminderCount:''}`},
+    {f:'PICKUP', label:`🏪 Pickup${pickupCount?' · '+pickupCount:''}`},
+    {f:'BW', label:`🌊 BW${bwCount?' · '+bwCount:''}`},
     {f:'STALE', label:`⏰ Stale 14-45d${staleCount?' · '+staleCount:''}`},
     {f:'CRITICAL', label:`🚨 Critical 45d+${criticalCount?' · '+criticalCount:''}`},
     {f:'SNOOZED', label:`💤 Snoozed${snoozedCount?' · '+snoozedCount:''}`},
@@ -2476,14 +3176,57 @@ function applyFilters(){
       if(o.category === 'DELIVERED' || o.category === 'INSTALLED') return false;
       if(snoozed) return false;
       if(daysInWarehouse(o, today) < 45) return false;
+    } else if(primaryFilter === 'NOT_NOTIFIED'){
+      // Customer notification not yet sent
+      if(!o.checkedIn || o.notifiedAt) return false;
+      if(o.category === 'DELIVERED' || o.category === 'INSTALLED' || o.category === 'STOCK') return false;
+      if(o.isStock || /drop.?ship/i.test(o.notes||'')) return false;
+    } else if(primaryFilter === 'NEEDS_REMINDER'){
+      // Customer was notified 3+ days ago but cover not delivered yet
+      if(!o.notifiedAt || o.deliveredAt || o.installedAt) return false;
+      const days = Math.floor((Date.now() - new Date(o.notifiedAt).getTime()) / 86400000);
+      if(days < 3) return false;
+      if(o.lastReminderAt && (Date.now() - new Date(o.lastReminderAt).getTime()) < 3*86400000) return false;
+    } else if(primaryFilter === 'PICKUP'){
+      // Customer pickup orders
+      if(!o.isPickup) return false;
+      if(o.category === 'DELIVERED' || o.category === 'INSTALLED') return false;
+    } else if(primaryFilter === 'BW'){
+      // Bluewater covers (active)
+      if(!o.isBW) return false;
+      if(o.category === 'DELIVERED' || o.category === 'INSTALLED') return false;
     }
     if(activeFilter){
       if(activeFilter==='ARRIVED'){ if(!o.checkedIn || o.category==='DELIVERED' || o.category==='INSTALLED') return false; }
       else { if(o.category !== activeFilter) return false; }
     }
     if(q){
-      const hay = [o.customer, o.poNumber, o.notes, o.tracking, o.checkedIn].map(x => String(x||'').toLowerCase()).join(' ');
-      if(!hay.includes(q)) return false;
+      // Smart search: recognize special tokens
+      // "bw" / "bluewater" → BW only
+      // "pickup" → pickup only
+      // "notified" → notified only
+      // "not notified" / "sin notificar" → not notified only
+      // "reminder" → needs reminder
+      const trimmedQ = q.replace(/\s+/g,' ');
+      let consumed = false;
+      if(/\b(bw|bluewater)\b/.test(trimmedQ)){ if(!o.isBW) return false; consumed = true; }
+      if(/\bpickup\b/.test(trimmedQ)){ if(!o.isPickup) return false; consumed = true; }
+      if(/\b(not.notified|sin.notificar|no.notificad)/.test(trimmedQ)){ if(o.notifiedAt) return false; consumed = true; }
+      else if(/\bnotified\b/.test(trimmedQ)){ if(!o.notifiedAt) return false; consumed = true; }
+      if(/\b(reminder|recordatorio)\b/.test(trimmedQ)){
+        if(!o.notifiedAt || o.deliveredAt || o.installedAt) return false;
+        const days = Math.floor((Date.now() - new Date(o.notifiedAt).getTime()) / 86400000);
+        if(days < 3) return false;
+        consumed = true;
+      }
+      // Strip recognized tokens from the query for free-text matching
+      const freeQ = trimmedQ
+        .replace(/\b(bw|bluewater|pickup|notified|not\s?notified|sin\s?notificar|no\s?notificad\w*|reminder|recordatorio)\b/g, '')
+        .replace(/\s+/g,' ').trim();
+      if(freeQ){
+        const hay = [o.customer, o.poNumber, o.notes, o.tracking, o.checkedIn, o.customerPhone, o.customerEmail].map(x => String(x||'').toLowerCase()).join(' ');
+        if(!hay.includes(freeQ)) return false;
+      }
     }
     return true;
   });
@@ -2880,10 +3623,17 @@ function renderTable(){
     // Old order indicator: ordered 90+ days ago, still not in terminal state
     const isOld = isOldOrder(o, 90) && o.category !== 'DELIVERED' && o.category !== 'INSTALLED';
     const oldBadge = isOld ? `<span class="old-badge" title="Ordered ${orderAgeDays(o)} days ago">📅 OLD</span>` : '';
+    const bwBadge = o.isBW ? `<span style="display:inline-block;padding:2px 7px;margin-left:6px;font-size:9.5px;font-weight:700;letter-spacing:0.4px;background:#1E88E5;color:#FFF;border-radius:4px;vertical-align:middle;" title="Bluewater Cover — special order">🌊 BW</span>` : '';
+    const pickupBadge = o.isPickup ? `<span style="display:inline-block;padding:2px 7px;margin-left:6px;font-size:9.5px;font-weight:700;letter-spacing:0.4px;background:#6A4C93;color:#FFF;border-radius:4px;vertical-align:middle;" title="Customer pickup — no delivery needed">🏪 PICKUP</span>` : '';
+    const notifiedBadge = o.notifiedAt ? `<span style="display:inline-block;padding:2px 7px;margin-left:6px;font-size:9.5px;font-weight:700;letter-spacing:0.4px;background:#1B5E20;color:#FFF;border-radius:4px;vertical-align:middle;" title="Customer notified ${fmtHistoryDate(o.notifiedAt)} via ${o.notifiedVia||'?'}">📧 NOTIFIED</span>` : '';
+    // Reminder badge: needs reminder if notified 3+ days ago and not delivered yet
+    const daysSinceNotified = o.notifiedAt ? Math.floor((Date.now() - new Date(o.notifiedAt).getTime()) / 86400000) : 0;
+    const needsReminder = o.notifiedAt && daysSinceNotified >= 3 && !o.deliveredAt && !o.installedAt && (!o.lastReminderAt || (Date.now() - new Date(o.lastReminderAt).getTime()) > 3*86400000);
+    const reminderBadge = needsReminder ? `<span style="display:inline-block;padding:2px 7px;margin-left:6px;font-size:9.5px;font-weight:700;letter-spacing:0.4px;background:#F57C00;color:#FFF;border-radius:4px;vertical-align:middle;animation:pulse 2s infinite;" title="${daysSinceNotified} days since notification — consider sending a reminder">⏰ REMINDER</span>` : '';
     return `
       <tr class="${rowCls}" data-idx="${idx}" data-id="${o.id}">
         <td><input type="checkbox" class="check-row bulk-check" ${isSelected?'checked':''} data-idx="${idx}" data-id="${o.id}" onclick="event.stopPropagation()"></td>
-        <td class="customer" data-idx="${idx}">${escapeHtml(o.customer||'—')}${isNew?'<span class="new-badge">NEW</span>':''}${oldBadge}${agingHtml}</td>
+        <td class="customer" data-idx="${idx}">${escapeHtml(o.customer||'—')}${isNew?'<span class="new-badge">NEW</span>':''}${bwBadge}${pickupBadge}${notifiedBadge}${reminderBadge}${oldBadge}${agingHtml}</td>
         <td class="mono">${escapeHtml(String(o.poNumber||'—'))}</td>
         <td class="mono">${fmtDateShort(o.orderDate)}</td>
         <td>${escapeHtml(o.notes||'—')}</td>
@@ -3172,6 +3922,28 @@ function openDrawer(idx){
       <textarea class="edit-field" data-field="internalNotes" placeholder="Team notes — e.g. &quot;Customer called 5/8 asking about ETA&quot;, &quot;Cover damaged on arrival, replacement requested&quot;…" style="text-align:left;min-height:80px;width:100%;font-family:inherit;">${escapeHtml(o.internalNotes||'')}</textarea>
     </div>
 
+    <div class="drawer-section" style="background:${o.isBW?'#E3F2FD':'transparent'};margin:0 -28px;padding:16px 28px;border-radius:0;${o.isBW?'border-left:3px solid #1E88E5;':''}">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;color:${o.isBW?'#0D47A1':'var(--ink)'};">
+        <input type="checkbox" id="bwToggle" ${o.isBW?'checked':''} style="width:18px;height:18px;cursor:pointer;accent-color:#1E88E5;">
+        <span style="font-size:14px;">🌊 Bluewater Cover (BW)</span>
+      </label>
+      <div style="font-size:11px;color:var(--ink-mute);margin-top:6px;padding-left:28px;line-height:1.5;">
+        ${o.isBW
+          ? '🌊 <strong style="color:#0D47A1;">BW marked</strong> — Service Log ticket will show "BW" so tech knows it\'s a special Bluewater cover.'
+          : 'Mark if this is a special Bluewater Cover ordered by the customer (not the standard Aspen cover).'}
+      </div>
+
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;color:${o.isPickup?'#6A4C93':'var(--ink)'};margin-top:14px;padding-top:14px;border-top:1px dashed ${o.isBW?'#90CAF9':'var(--line-soft)'};">
+        <input type="checkbox" id="pickupToggle" ${o.isPickup?'checked':''} style="width:18px;height:18px;cursor:pointer;accent-color:#6A4C93;">
+        <span style="font-size:14px;">🏪 Customer pickup (no delivery)</span>
+      </label>
+      <div style="font-size:11px;color:var(--ink-mute);margin-top:6px;padding-left:28px;line-height:1.5;">
+        ${o.isPickup
+          ? '🏪 <strong style="color:#6A4C93;">Pickup marked</strong> — no Service Log ticket needed. Just notify customer when arrived.'
+          : 'Mark if customer will pick up at warehouse (no delivery scheduled, no tech needed).'}
+      </div>
+    </div>
+
     <div class="drawer-section">
       <h4>Logistics</h4>
       <div class="drawer-row"><span class="k">Order date</span><span class="v mono">${fmtDate(o.orderDate)}</span></div>
@@ -3184,6 +3956,39 @@ function openDrawer(idx){
         <a href="#" id="custHistoryLink" style="font-weight:500;font-size:11px;color:var(--gold);text-transform:none;letter-spacing:0;margin-left:8px;">View all covers for this customer →</a>
       </h4>
       <div class="drawer-row"><span class="k">Name</span><span class="v">${escapeHtml((o.customerName || o.customer || '—').split('—')[0].trim())}</span></div>
+      <div class="drawer-row">
+        <span class="k">Phone</span>
+        <input class="edit-field" data-field="customerPhone" type="tel" placeholder="e.g. 314-555-0123" value="${escapeHtml(o.customerPhone||'')}">
+      </div>
+      <div class="drawer-row">
+        <span class="k">Email</span>
+        <input class="edit-field" data-field="customerEmail" type="email" placeholder="customer@example.com" value="${escapeHtml(o.customerEmail||'')}">
+      </div>
+
+      ${(o.checkedIn && !o.deliveredAt && !o.installedAt && !o.isStock && o.category !== 'STOCK' && !/drop.?ship/i.test(o.notes||''))
+        ? (() => {
+          const daysSinceNotified = o.notifiedAt ? Math.floor((Date.now() - new Date(o.notifiedAt).getTime()) / 86400000) : 0;
+          const needsReminder = o.notifiedAt && daysSinceNotified >= 3;
+          return `
+        <div style="margin-top:14px;padding:14px;background:${needsReminder ? '#FFF8E1' : (o.notifiedAt ? '#F1F8F3' : '#FBF1DA')};border-radius:10px;border:1px solid ${needsReminder ? '#FFCC02' : (o.notifiedAt ? '#A8D5BA' : '#E5C28D')};">
+          <div style="font-size:12px;font-weight:600;color:${needsReminder ? '#E65100' : (o.notifiedAt ? '#1B5E20' : '#856404')};margin-bottom:8px;">
+            ${needsReminder
+              ? `⏰ ${daysSinceNotified} days since notification — time for a reminder?`
+              : (o.notifiedAt
+                ? `✅ Customer notified ${fmtHistoryDate(o.notifiedAt)}${o.notifiedVia ? ` via ${o.notifiedVia}` : ''}${o.notifiedBy ? ` by ${escapeHtml(o.notifiedBy)}` : ''}`
+                : '📧 Customer not yet notified that the cover arrived')}
+          </div>
+          ${o.lastReminderAt ? `<div style="font-size:11px;color:var(--ink-mute);margin-bottom:8px;">Last reminder sent ${fmtHistoryDate(o.lastReminderAt)}</div>` : ''}
+          <button class="btn" id="actNotifyCustomer" style="width:100%;justify-content:center;background:${needsReminder?'#F57C00':(o.notifiedAt?'#FFF':'#1E88E5')};color:${needsReminder?'#FFF':(o.notifiedAt?'#1E88E5':'#FFF')};border:1.5px solid ${needsReminder?'#F57C00':'#1E88E5'};font-weight:600;">
+            ${needsReminder ? '⏰ Send reminder now' : (o.notifiedAt ? '🔄 Re-notify customer' : '📧 Notify customer — cover arrived')}
+          </button>
+          <div style="font-size:11px;color:var(--ink-mute);margin-top:8px;line-height:1.5;">
+            Opens a picker to choose SMS/email templates. ${needsReminder ? 'Reminder templates are pre-selected.' : 'Optionally CC the team (internal email).'}
+          </div>
+        </div>
+          `;
+        })()
+        : ''}
     </div>
 
     ${(o.history && o.history.length) ? `
@@ -3241,6 +4046,41 @@ function openDrawer(idx){
   });
   wire('drawerUnsnooze',       () => unsnoozeCover(idx));
   wire('custHistoryLink',      (e) => { if(e && e.preventDefault) e.preventDefault(); openCustomerHistory(o.customerName || o.customer); });
+
+  // 🌊 Bluewater Cover toggle
+  const bwToggle = document.getElementById('bwToggle');
+  if(bwToggle){
+    bwToggle.onchange = () => {
+      o.isBW = bwToggle.checked;
+      o.modified = true;
+      logChange(o, o.isBW ? 'marked_bw' : 'unmarked_bw');
+      changeCount++;
+      saveToStorage();
+      openDrawer(idx); // refresh drawer to update styling
+      render();
+    };
+  }
+
+  // 🏪 Pickup toggle
+  const pickupToggle = document.getElementById('pickupToggle');
+  if(pickupToggle){
+    pickupToggle.onchange = () => {
+      o.isPickup = pickupToggle.checked;
+      o.modified = true;
+      logChange(o, o.isPickup ? 'marked_pickup' : 'unmarked_pickup');
+      changeCount++;
+      saveToStorage();
+      openDrawer(idx);
+      render();
+    };
+  }
+
+  // 📧 Notify Customer button — pass reminder flag if 3+ days since notification
+  wire('actNotifyCustomer', () => {
+    const daysSinceNotified = o.notifiedAt ? Math.floor((Date.now() - new Date(o.notifiedAt).getTime()) / 86400000) : 0;
+    const isReminder = o.notifiedAt && daysSinceNotified >= 3;
+    notifyCustomer(idx, {reminder: isReminder});
+  });
 
   // Photo handlers
   const photoInput = document.getElementById('photoInput');
@@ -3530,9 +4370,88 @@ $$('thead th[data-sort]').forEach(th => th.addEventListener('click', () => {
 }));
 $('#closeDrawer').addEventListener('click', closeDrawer);
 $('#drawerOverlay').addEventListener('click', closeDrawer);
+
+// ═══ KEYBOARD SHORTCUTS ═══
 document.addEventListener('keydown', e => {
-  if(e.key==='Escape'){ closeDrawer(); closeAddStockModal(); }
+  // Esc: close modals, drawers
+  if(e.key === 'Escape'){
+    // Close JS-injected modals first
+    document.querySelectorAll('.modal-backdrop').forEach(m => m.remove());
+    closeDrawer();
+    closeAddStockModal();
+    return;
+  }
+  // Don't trigger shortcuts when typing in inputs / textareas
+  const inField = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT' || e.target.isContentEditable);
+  if(inField) return;
+  // Don't fire on Cmd/Ctrl+key combos
+  if(e.metaKey || e.ctrlKey || e.altKey) return;
+
+  switch(e.key.toLowerCase()){
+    case 'n':
+      // New arrival
+      const addBtn = document.getElementById('addStockBtn');
+      if(addBtn && !addBtn.classList.contains('hidden')) addBtn.click();
+      e.preventDefault();
+      break;
+    case 's':
+    case '/':
+      // Focus search
+      const search = document.getElementById('searchInput');
+      if(search){ search.focus(); search.select(); e.preventDefault(); }
+      break;
+    case 't':
+      // Templates
+      const tplBtn = document.getElementById('templatesBtn');
+      if(tplBtn && !tplBtn.classList.contains('hidden')){ tplBtn.click(); e.preventDefault(); }
+      break;
+    case '?':
+      showKeyboardShortcuts();
+      e.preventDefault();
+      break;
+  }
 });
+
+// Show keyboard shortcuts help
+function showKeyboardShortcuts(){
+  if(document.getElementById('shortcutsModal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'shortcutsModal';
+  modal.className = 'modal-backdrop';
+  modal.innerHTML = `
+    <div class="modal-card" style="max-width:480px;">
+      <div class="modal-head">
+        <h3 style="margin:0;font-family:'Fraunces',serif;font-style:italic;">⌨️ Keyboard shortcuts</h3>
+        <button class="modal-close" id="shortcutsClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:10px 24px;align-items:center;font-size:13px;">
+          <kbd style="padding:4px 10px;background:#FAF7EF;border:1px solid #E5D9C0;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;">N</kbd> <span>New cover arrival</span>
+          <kbd style="padding:4px 10px;background:#FAF7EF;border:1px solid #E5D9C0;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;">S</kbd> <span>Focus search</span>
+          <kbd style="padding:4px 10px;background:#FAF7EF;border:1px solid #E5D9C0;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;">T</kbd> <span>Open Templates</span>
+          <kbd style="padding:4px 10px;background:#FAF7EF;border:1px solid #E5D9C0;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;">/</kbd> <span>Focus search (also)</span>
+          <kbd style="padding:4px 10px;background:#FAF7EF;border:1px solid #E5D9C0;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;">Esc</kbd> <span>Close modal / drawer</span>
+          <kbd style="padding:4px 10px;background:#FAF7EF;border:1px solid #E5D9C0;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;">?</kbd> <span>Show this help</span>
+        </div>
+        <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--line);">
+          <strong style="font-size:13px;display:block;margin-bottom:8px;">🔍 Smart search tokens</strong>
+          <div style="font-size:12px;color:var(--ink-mute);line-height:1.7;">
+            Type these words in the search box to filter:<br>
+            <code style="background:#FAF7EF;padding:2px 6px;border-radius:4px;">bw</code> · BW covers only<br>
+            <code style="background:#FAF7EF;padding:2px 6px;border-radius:4px;">pickup</code> · pickup orders only<br>
+            <code style="background:#FAF7EF;padding:2px 6px;border-radius:4px;">notified</code> · already notified<br>
+            <code style="background:#FAF7EF;padding:2px 6px;border-radius:4px;">sin notificar</code> · not notified yet<br>
+            <code style="background:#FAF7EF;padding:2px 6px;border-radius:4px;">reminder</code> · needs reminder (3+ days)<br>
+            <span style="opacity:0.7;">You can combine them: <code style="background:#FAF7EF;padding:2px 6px;border-radius:4px;">bw sin notificar</code></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  document.getElementById('shortcutsClose').onclick = () => modal.remove();
+  modal.onclick = e => { if(e.target === modal) modal.remove(); };
+}
 
 $('#copyHtmlBtn').addEventListener('click', copyAsHtml);
 $('#downloadEmlBtn').addEventListener('click', downloadEml);
@@ -3559,6 +4478,7 @@ $('#lightbox').addEventListener('click', e => { if(e.target.id==='lightbox' || e
 
 $('#addStockBtn').addEventListener('click', openAddStock);
 $('#weeklyReportBtn').addEventListener('click', emailWeeklyReport);
+$('#templatesBtn').addEventListener('click', openTemplatesModal);
 $('#cleanExcelBtn').addEventListener('click', exportCleanXlsx);
 $('#deliveredReportBtn').addEventListener('click', showDeliveredReport);
 $('#closeAddStock').addEventListener('click', closeAddStockModal);
@@ -3690,6 +4610,61 @@ $('#bulkServiceLog').addEventListener('click', () => {
     });
     toast(`🎫 Sending ${N} cover${N===1?'':'s'} to Service Log`, 'success');
   }
+});
+
+// 📧 Bulk notify customers
+$('#bulkNotify').addEventListener('click', () => {
+  const selected = [...selectedIds];
+  const eligible = selected
+    .map(id => allCovers.findIndex(c => c.id === id))
+    .filter(i => i >= 0)
+    .filter(i => {
+      const o = allCovers[i];
+      if(o.deliveredAt || o.installedAt) return false;
+      if(o.isStock || /drop.?ship/i.test(o.notes||'') || o.category === 'STOCK') return false;
+      if(!o.checkedIn) return false;
+      return true;
+    });
+
+  if(eligible.length === 0){
+    toast('No eligible covers selected — must be arrived, not delivered, customer cover', 'warn');
+    return;
+  }
+
+  // Warn about missing contact info
+  const missing = eligible.filter(i => {
+    const o = allCovers[i];
+    return !o.customerPhone && !o.customerEmail;
+  });
+  const N = eligible.length;
+  const M = missing.length;
+
+  let msg = `📧 Notify ${N} customer${N===1?'':'s'} that their cover arrived?\n\n`;
+  msg += `Will open the picker for each — choose template, send SMS + email + (optional) internal alert.\n`;
+  if(M) msg += `\n⚠️ ${M} of them have NO phone or email on file. You can still notify but you'll need to add their info first.\n`;
+  msg += `\nWe'll process them one at a time so you can confirm each.`;
+
+  if(!confirm(msg)) return;
+
+  // Process them sequentially (one picker at a time)
+  let i = 0;
+  const next = () => {
+    if(i >= eligible.length){
+      toast(`📧 Notified ${i} customer${i===1?'':'s'}`, 'success');
+      return;
+    }
+    const idx = eligible[i++];
+    notifyCustomer(idx);
+    // The picker is modal — we wait for it to close before next
+    const observer = new MutationObserver(() => {
+      if(!document.getElementById('notifyPickerModal')){
+        observer.disconnect();
+        setTimeout(next, 500);
+      }
+    });
+    observer.observe(document.body, {childList: true});
+  };
+  next();
 });
 $('#bulkDelivered').addEventListener('click', () => bulkAction(i => {
   const o = allCovers[i];
